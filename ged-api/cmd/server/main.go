@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -19,6 +20,9 @@ import (
 )
 
 func main() {
+	runMigrations := flag.Bool("migrate", false, "Executar migrations antes de iniciar o servidor")
+	flag.Parse()
+
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
 
@@ -28,6 +32,13 @@ func main() {
 	}
 
 	gin.SetMode(cfg.GinMode)
+
+	// Migrations (opcional via --migrate)
+	if *runMigrations {
+		if err := database.RunMigrations(cfg.DatabaseURL, "migrations"); err != nil {
+			log.Fatal().Err(err).Msg("erro ao executar migrations")
+		}
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
