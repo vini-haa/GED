@@ -30,4 +30,4 @@ migrate-force:
 	migrate -path migrations -database "$(DATABASE_URL)" force $(VERSION)
 
 sqlc-generate:
-	sqlc generate -f sqlc/sqlc.yaml
+	cd sqlc && sqlc generate
