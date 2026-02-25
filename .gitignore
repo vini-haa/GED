@@ -1,0 +1,17 @@
+# Credenciais e secrets
+credentials/
+*.pem
+*.key
+.env
+
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Claude Code
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db

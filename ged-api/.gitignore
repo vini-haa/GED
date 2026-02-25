@@ -1,0 +1,34 @@
+# Binários
+ged-api
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Build output
+/bin/
+/tmp/
+
+# Env e credenciais
+.env
+credentials.json
+*.pem
+*.key
+
+# Go
+vendor/
+*.test
+*.out
+*.prof
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

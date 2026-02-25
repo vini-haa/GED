@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: ged-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ged_fadex
+      POSTGRES_USER: ged_user
+      POSTGRES_PASSWORD: ged_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - ged_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ged_user -d ged_fadex"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ged-api:
+    build: .
+    container_name: ged-api
+    restart: unless-stopped
+    ports:
+      - "4017:4017"
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  ged_pgdata:
