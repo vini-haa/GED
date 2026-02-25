@@ -3,11 +3,20 @@ credentials/
 *.pem
 *.key
 .env
+.env.local
+.env*.local
 
 # Python
 venv/
 __pycache__/
 *.pyc
+
+# Node.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
 
 # Claude Code
 .claude/
@@ -15,3 +24,6 @@ __pycache__/
 # OS
 .DS_Store
 Thumbs.db
+
+# Binários Go
+ged-api/server
