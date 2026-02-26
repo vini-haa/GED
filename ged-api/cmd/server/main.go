@@ -31,6 +31,10 @@ func main() {
 		log.Fatal().Err(err).Msg("erro ao carregar configuração")
 	}
 
+	if cfg.NextAuthSecret == "" {
+		log.Fatal().Msg("NEXTAUTH_SECRET é obrigatória")
+	}
+
 	gin.SetMode(cfg.GinMode)
 
 	// Migrations (opcional via --migrate)
@@ -66,10 +70,16 @@ func main() {
 
 	// Handlers
 	healthHandler := handler.NewHealthHandler(pg, sagi)
+	meHandler := handler.NewMeHandler()
 
 	// Rotas públicas
 	api := r.Group("/api")
 	api.GET("/health", healthHandler.Check)
+
+	// Rotas autenticadas
+	auth := api.Group("")
+	auth.Use(middleware.AuthMiddleware(pg, cfg.NextAuthSecret))
+	auth.GET("/me", meHandler.Me)
 
 	// Shutdown graceful
 	quit := make(chan os.Signal, 1)
