@@ -1,21 +1,24 @@
 services:
-  postgres:
+  postgresql:
     image: postgres:15-alpine
     container_name: ged-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ged_fadex
       POSTGRES_USER: ged_user
-      POSTGRES_PASSWORD: ged_pass
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD obrigatória no .env}
     ports:
       - "5432:5432"
     volumes:
-      - ged_pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ged_user -d ged_fadex"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
+    networks:
+      - ged-network
 
   ged-api:
     build: .
@@ -25,9 +28,52 @@ services:
       - "4017:4017"
     env_file:
       - .env
+    environment:
+      DATABASE_URL: postgres://ged_user:${POSTGRES_PASSWORD}@postgresql:5432/ged_fadex?sslmode=disable
+    volumes:
+      - ./credentials.json:/app/credentials.json:ro
     depends_on:
-      postgres:
+      postgresql:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider --quiet http://localhost:4017/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - ged-network
+
+  backup:
+    image: postgres:15-alpine
+    container_name: ged-backup
+    restart: unless-stopped
+    environment:
+      PGHOST: postgresql
+      PGPORT: "5432"
+      PGDATABASE: ged_fadex
+      PGUSER: ged_user
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_RETENTION_DAYS: "30"
+    volumes:
+      - ./backups:/backups
+      - ./scripts/backup.sh:/usr/local/bin/backup.sh:ro
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        chmod +x /usr/local/bin/backup.sh
+        echo "0 2 * * * /usr/local/bin/backup.sh >> /backups/backup.log 2>&1" > /var/spool/cron/crontabs/root
+        echo "=== Backup scheduler iniciado (diário às 02:00) ==="
+        crond -f -l 2
+    networks:
+      - ged-network
 
 volumes:
-  ged_pgdata:
+  pgdata:
+
+networks:
+  ged-network:
+    driver: bridge

@@ -16,6 +16,9 @@ credentials.json
 *.pem
 *.key
 
+# Backups
+backups/
+
 # Go
 vendor/
 *.test
