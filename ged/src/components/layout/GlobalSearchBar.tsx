@@ -1,12 +1,31 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, FileText, X, Tag } from 'lucide-react';
+import { Search, FileText, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { protocols } from '@/lib/data';
+import { mockProtocols } from '@/lib/mock-protocols';
 import Link from 'next/link';
-import type { Protocol } from '@/lib/types';
+import type { Protocol, ProtocolStatus } from '@/lib/types';
+
+function getStatusVariant(
+  status: ProtocolStatus
+): 'success' | 'warning' | 'default' | 'destructive' {
+  switch (status) {
+    case 'Concluído':
+      return 'success';
+    case 'Pendente':
+      return 'warning';
+    case 'Cancelado':
+      return 'destructive';
+    default:
+      return 'default';
+  }
+}
+
+function formatNumber(numero: number, ano: number): string {
+  return `${String(numero).padStart(5, '0')}/${ano}`;
+}
 
 export function GlobalSearchBar() {
   const [query, setQuery] = useState('');
@@ -26,11 +45,14 @@ export function GlobalSearchBar() {
 
     const timer = setTimeout(() => {
       const q = query.toLowerCase();
-      const filtered = protocols.filter(
+      const filtered = mockProtocols.filter(
         (p) =>
-          p.number.toLowerCase().includes(q) ||
-          p.project.toLowerCase().includes(q) ||
-          p.interestedParty.toLowerCase().includes(q)
+          `${p.numeroProtocolo}/${p.anoProtocolo}`.includes(q) ||
+          (p.assunto && p.assunto.toLowerCase().includes(q)) ||
+          (p.projetoDescricao &&
+            p.projetoDescricao.toLowerCase().includes(q)) ||
+          (p.setorOrigem && p.setorOrigem.toLowerCase().includes(q)) ||
+          (p.setorDestino && p.setorDestino.toLowerCase().includes(q))
       );
 
       setTotalResults(filtered.length);
@@ -67,13 +89,16 @@ export function GlobalSearchBar() {
   }, []);
 
   return (
-    <div ref={containerRef} className="relative ml-auto flex-1 sm:flex-initial">
+    <div
+      ref={containerRef}
+      className="relative ml-auto flex-1 sm:flex-initial"
+    >
       <div className="relative">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
           ref={inputRef}
           type="search"
-          placeholder="Buscar por número, projeto ou interessado..."
+          placeholder="Buscar por número, assunto ou setor..."
           className="pl-8 pr-8 sm:w-[300px] md:w-[200px] lg:w-[400px]"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -103,7 +128,7 @@ export function GlobalSearchBar() {
             {results.map((protocol) => (
               <Link
                 key={protocol.id}
-                href={`/protocolo/${protocol.id}`}
+                href={`/protocolo/${protocol.numeroProtocolo}/${protocol.anoProtocolo}`}
                 className="flex items-start gap-3 px-3 py-2.5 hover:bg-accent transition-colors"
                 onClick={handleResultClick}
               >
@@ -111,25 +136,21 @@ export function GlobalSearchBar() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-medium truncate">
-                      {protocol.number}
+                      {formatNumber(
+                        protocol.numeroProtocolo,
+                        protocol.anoProtocolo
+                      )}
                     </p>
                     <Badge
-                      variant={
-                        protocol.status === 'Concluído'
-                          ? 'success'
-                          : protocol.status === 'Pendente'
-                            ? 'warning'
-                            : protocol.status === 'Cancelado'
-                              ? 'destructive'
-                              : 'default'
-                      }
+                      variant={getStatusVariant(protocol.situacao)}
                       className="text-[10px] px-1.5 py-0"
                     >
-                      {protocol.status}
+                      {protocol.situacao}
                     </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground truncate">
-                    {protocol.project} — {protocol.interestedParty}
+                    {protocol.assunto ?? 'Sem assunto'} —{' '}
+                    {protocol.setorDestino ?? '—'}
                   </p>
                 </div>
               </Link>

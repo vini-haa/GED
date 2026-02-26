@@ -1,0 +1,200 @@
+'use client';
+
+import { useMemo } from 'react';
+import { format, formatDistanceToNow, differenceInDays, differenceInHours } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { ArrowRight, Clock, MapPin, Route } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useTramitacoes } from '@/hooks/use-observacoes';
+import type { TramitacaoSagi } from '@/lib/types';
+
+function formatPermanencia(fromDate: string, toDate: string | null): string {
+  const from = new Date(fromDate);
+  const to = toDate ? new Date(toDate) : new Date();
+
+  const days = differenceInDays(to, from);
+  const hours = differenceInHours(to, from) % 24;
+
+  if (days === 0) {
+    if (hours === 0) return 'Menos de 1 hora';
+    return `${hours}h`;
+  }
+  if (days === 1) return hours > 0 ? `1 dia e ${hours}h` : '1 dia';
+  return `${days} dias`;
+}
+
+interface TramitacaoTimelineProps {
+  protocoloSagi: string;
+}
+
+export function TramitacaoTimeline({
+  protocoloSagi,
+}: TramitacaoTimelineProps) {
+  const { data: tramitacoes, isLoading } = useTramitacoes(protocoloSagi);
+
+  // Calcular permanência de cada tramitação
+  const items = useMemo(() => {
+    if (!tramitacoes || tramitacoes.length === 0) return [];
+
+    return tramitacoes.map((tram, index) => {
+      const isLast = index === tramitacoes.length - 1;
+      const nextDate = isLast
+        ? null
+        : tramitacoes[index + 1].tramitadoEm;
+
+      return {
+        ...tram,
+        permanencia: formatPermanencia(tram.tramitadoEm, nextDate),
+        isLast,
+      };
+    });
+  }, [tramitacoes]);
+
+  // Setor atual = destino da última tramitação
+  const setorAtual = useMemo(() => {
+    if (!tramitacoes || tramitacoes.length === 0) return null;
+    const last = tramitacoes[tramitacoes.length - 1];
+    return {
+      nome: last.paraSetor,
+      desde: last.tramitadoEm,
+    };
+  }, [tramitacoes]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-16 w-full rounded-xl" />
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="flex gap-4">
+            <Skeleton className="h-6 w-6 rounded-full shrink-0" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-48" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (!tramitacoes || tramitacoes.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-border/50 bg-card/50 py-12">
+        <Route className="h-10 w-10 text-muted-foreground/40" />
+        <div className="text-center">
+          <p className="text-sm font-medium">Sem registro de tramitação</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Este protocolo ainda não possui movimentações registradas.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Resumo */}
+      {setorAtual && (
+        <div className="flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
+            <MapPin className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <p className="text-sm font-medium">
+              Protocolo no setor{' '}
+              <span className="text-primary">{setorAtual.nome}</span>
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Há{' '}
+              {formatDistanceToNow(new Date(setorAtual.desde), {
+                locale: ptBR,
+              })}{' '}
+              — desde{' '}
+              {format(new Date(setorAtual.desde), "dd/MM/yyyy 'às' HH:mm", {
+                locale: ptBR,
+              })}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Timeline */}
+      <div className="relative pl-8">
+        {/* Linha vertical */}
+        <div className="absolute left-[11px] top-2 bottom-2 w-px bg-border/60" />
+
+        <div className="space-y-6">
+          {items.map((item) => (
+            <div key={item.id} className="relative">
+              {/* Nó do círculo */}
+              <div
+                className={`absolute -left-8 top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 ${
+                  item.isLast
+                    ? 'border-primary bg-primary/10'
+                    : 'border-border bg-background'
+                }`}
+              >
+                <div
+                  className={`h-2 w-2 rounded-full ${
+                    item.isLast ? 'bg-primary animate-pulse' : 'bg-muted-foreground/40'
+                  }`}
+                />
+              </div>
+
+              {/* Conteúdo */}
+              <div
+                className={`rounded-lg border p-3 ${
+                  item.isLast
+                    ? 'border-primary/30 bg-primary/5'
+                    : 'border-border/40'
+                }`}
+              >
+                {/* Setores */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className="text-xs">
+                    {item.deSetor}
+                  </Badge>
+                  <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                  <Badge
+                    variant={item.isLast ? 'default' : 'outline'}
+                    className="text-xs"
+                  >
+                    {item.paraSetor}
+                  </Badge>
+                </div>
+
+                {/* Despacho */}
+                {item.despacho && (
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {item.despacho}
+                  </p>
+                )}
+
+                {/* Metadados */}
+                <div className="mt-2 flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
+                  <span>
+                    {format(
+                      new Date(item.tramitadoEm),
+                      "dd/MM/yyyy 'às' HH:mm",
+                      { locale: ptBR }
+                    )}
+                  </span>
+                  <span>·</span>
+                  <span>{item.tramitadoPorNome}</span>
+                  <span>·</span>
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {item.isLast
+                      ? `Há ${formatPermanencia(item.tramitadoEm, null)} (atual)`
+                      : item.permanencia}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
