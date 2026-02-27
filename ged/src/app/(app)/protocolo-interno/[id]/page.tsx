@@ -12,15 +12,28 @@ import {
   Clock,
   FileText,
   MapPin,
+  MessageSquare,
+  Pencil,
   Route,
   User,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
 import { StatusDropdown, StatusBadge } from '@/components/protocolo-interno/StatusDropdown';
 import { TramitarModal } from '@/components/protocolo-interno/TramitarModal';
+import { EditarProtocoloModal } from '@/components/protocolo-interno/EditarProtocoloModal';
+import { DocumentoList } from '@/components/protocolo/DocumentoList';
+import { ObservacaoList } from '@/components/protocolo/ObservacaoList';
 import { useProtocoloInternoDetail } from '@/hooks/use-protocolos-internos';
+import { useObservacoes } from '@/hooks/use-observacoes';
+import { useDocumentos } from '@/hooks/use-documentos';
 import { usePermissions } from '@/hooks/use-permissions';
 import type { TramitacaoInterna } from '@/lib/types';
 
@@ -48,7 +61,12 @@ export default function ProtocoloInternoDetalhesPage({ params }: PageProps) {
   const { data, isLoading, isError } = useProtocoloInternoDetail(id);
   const { isAdmin, canEdit } = usePermissions();
 
+  const protocoloNumero = data?.protocolo.numero ?? '';
+  const { data: documentos } = useDocumentos(protocoloNumero);
+  const { data: observacoes } = useObservacoes(protocoloNumero);
+
   const [tramitarOpen, setTramitarOpen] = useState(false);
+  const [editarOpen, setEditarOpen] = useState(false);
 
   // Calcular setor atual
   const setorAtual = useMemo(() => {
@@ -156,13 +174,23 @@ export default function ProtocoloInternoDetalhesPage({ params }: PageProps) {
 
         {/* Ações */}
         {canTramitar && (
-          <Button
-            onClick={() => setTramitarOpen(true)}
-            className="gap-2"
-          >
-            <ArrowRightLeft className="h-4 w-4" />
-            Tramitar
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setEditarOpen(true)}
+              className="gap-2"
+            >
+              <Pencil className="h-4 w-4" />
+              Editar
+            </Button>
+            <Button
+              onClick={() => setTramitarOpen(true)}
+              className="gap-2"
+            >
+              <ArrowRightLeft className="h-4 w-4" />
+              Tramitar
+            </Button>
+          </div>
         )}
       </div>
 
@@ -245,105 +273,135 @@ export default function ProtocoloInternoDetalhesPage({ params }: PageProps) {
         </div>
       )}
 
-      {/* Timeline de tramitação */}
-      <div>
-        <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">
-          <ArrowRightLeft className="h-5 w-5" />
-          Tramitação
-        </h2>
+      {/* Abas: Documentos, Observações, Tramitação */}
+      <Tabs defaultValue="documentos">
+        <TabsList>
+          <TabsTrigger value="documentos" className="gap-1.5">
+            <FileText className="h-4 w-4" />
+            Documentos
+            {documentos && documentos.length > 0 && (
+              <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                {documentos.length}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="observacoes" className="gap-1.5">
+            <MessageSquare className="h-4 w-4" />
+            Observações
+            {observacoes && observacoes.length > 0 && (
+              <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                {observacoes.length}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="tramitacao" className="gap-1.5">
+            <ArrowRightLeft className="h-4 w-4" />
+            Tramitação
+          </TabsTrigger>
+        </TabsList>
 
-        {tramitacoes.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-border/50 bg-card/50 py-12">
-            <Route className="h-10 w-10 text-muted-foreground/40" />
-            <div className="text-center">
-              <p className="text-sm font-medium">
-                Sem registro de tramitação
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Este protocolo ainda não foi tramitado para outro setor.
-              </p>
+        <TabsContent value="documentos" className="mt-4">
+          <DocumentoList protocoloSagi={protocoloNumero} />
+        </TabsContent>
+
+        <TabsContent value="observacoes" className="mt-4">
+          <ObservacaoList protocoloSagi={protocoloNumero} />
+        </TabsContent>
+
+        <TabsContent value="tramitacao" className="mt-4">
+          {tramitacoes.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-border/50 bg-card/50 py-12">
+              <Route className="h-10 w-10 text-muted-foreground/40" />
+              <div className="text-center">
+                <p className="text-sm font-medium">
+                  Sem registro de tramitação
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Este protocolo ainda não foi tramitado para outro setor.
+                </p>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="relative pl-8">
-            {/* Linha vertical */}
-            <div className="absolute left-[11px] top-2 bottom-2 w-px bg-border/60" />
+          ) : (
+            <div className="relative pl-8">
+              {/* Linha vertical */}
+              <div className="absolute left-[11px] top-2 bottom-2 w-px bg-border/60" />
 
-            <div className="space-y-6">
-              {timelineItems.map((item) => (
-                <div key={item.id} className="relative">
-                  {/* Nó do círculo */}
-                  <div
-                    className={`absolute -left-8 top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 ${
-                      item.isLast
-                        ? 'border-primary bg-primary/10'
-                        : 'border-border bg-background'
-                    }`}
-                  >
+              <div className="space-y-6">
+                {timelineItems.map((item) => (
+                  <div key={item.id} className="relative">
+                    {/* Nó do círculo */}
                     <div
-                      className={`h-2 w-2 rounded-full ${
+                      className={`absolute -left-8 top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 ${
                         item.isLast
-                          ? 'bg-primary animate-pulse'
-                          : 'bg-muted-foreground/40'
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border bg-background'
                       }`}
-                    />
-                  </div>
-
-                  {/* Conteúdo */}
-                  <div
-                    className={`rounded-lg border p-3 ${
-                      item.isLast
-                        ? 'border-primary/30 bg-primary/5'
-                        : 'border-border/40'
-                    }`}
-                  >
-                    {/* Setores */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant="outline" className="text-xs">
-                        {item.deSetor}
-                      </Badge>
-                      <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
-                      <Badge
-                        variant={item.isLast ? 'default' : 'outline'}
-                        className="text-xs"
-                      >
-                        {item.paraSetor}
-                      </Badge>
+                    >
+                      <div
+                        className={`h-2 w-2 rounded-full ${
+                          item.isLast
+                            ? 'bg-primary animate-pulse'
+                            : 'bg-muted-foreground/40'
+                        }`}
+                      />
                     </div>
 
-                    {/* Despacho */}
-                    {item.despacho && (
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        {item.despacho}
-                      </p>
-                    )}
+                    {/* Conteúdo */}
+                    <div
+                      className={`rounded-lg border p-3 ${
+                        item.isLast
+                          ? 'border-primary/30 bg-primary/5'
+                          : 'border-border/40'
+                      }`}
+                    >
+                      {/* Setores */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="outline" className="text-xs">
+                          {item.deSetor}
+                        </Badge>
+                        <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <Badge
+                          variant={item.isLast ? 'default' : 'outline'}
+                          className="text-xs"
+                        >
+                          {item.paraSetor}
+                        </Badge>
+                      </div>
 
-                    {/* Metadados */}
-                    <div className="mt-2 flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
-                      <span>
-                        {format(
-                          new Date(item.tramitadoEm),
-                          "dd/MM/yyyy 'às' HH:mm",
-                          { locale: ptBR }
-                        )}
-                      </span>
-                      <span>·</span>
-                      <span>{item.tramitadoPorNome}</span>
-                      <span>·</span>
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {item.isLast
-                          ? `Há ${formatPermanencia(item.tramitadoEm, null)} (atual)`
-                          : item.permanencia}
-                      </span>
+                      {/* Despacho */}
+                      {item.despacho && (
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          {item.despacho}
+                        </p>
+                      )}
+
+                      {/* Metadados */}
+                      <div className="mt-2 flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
+                        <span>
+                          {format(
+                            new Date(item.tramitadoEm),
+                            "dd/MM/yyyy 'às' HH:mm",
+                            { locale: ptBR }
+                          )}
+                        </span>
+                        <span>·</span>
+                        <span>{item.tramitadoPorNome}</span>
+                        <span>·</span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {item.isLast
+                            ? `Há ${formatPermanencia(item.tramitadoEm, null)} (atual)`
+                            : item.permanencia}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* Modal de tramitação */}
       {setorAtual && (
@@ -354,6 +412,13 @@ export default function ProtocoloInternoDetalhesPage({ params }: PageProps) {
           setorAtual={setorAtual}
         />
       )}
+
+      {/* Modal de edição */}
+      <EditarProtocoloModal
+        open={editarOpen}
+        onOpenChange={setEditarOpen}
+        protocolo={protocolo}
+      />
     </div>
   );
 }

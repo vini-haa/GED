@@ -181,6 +181,125 @@ export interface CreateProtocoloInternoRequest {
   setorOrigem: string;
 }
 
+/** Request para editar protocolo interno */
+export interface UpdateProtocoloInternoRequest {
+  id: string;
+  assunto: string;
+  descricao?: string;
+}
+
+// ============================================
+// Dashboard (Semana 8)
+// ============================================
+
+/** Filtros globais do dashboard */
+export interface DashboardFilters {
+  periodo: '7d' | '30d' | '90d' | '1y';
+  setor: string | 'all';
+  projeto: string | 'all';
+}
+
+/** KPI com valor e variação percentual */
+export interface DashboardKpi {
+  label: string;
+  valor: number;
+  variacao: number;
+  formato: 'numero' | 'dias';
+}
+
+/** Ponto de dados para gráfico de uploads por período */
+export interface UploadsPeriodoItem {
+  data: string;
+  uploads: number;
+  protocolos: number;
+}
+
+/** Fatia para gráfico de documentos por tipo */
+export interface DocsPorTipoItem {
+  tipo: string;
+  quantidade: number;
+  cor: string;
+}
+
+/** Barra para gráfico de tramitação por setor */
+export interface TramitacaoSetorItem {
+  setor: string;
+  tempoMedioDias: number;
+  acimaDaMedia: boolean;
+}
+
+/** Item do ranking de uploads */
+export interface RankingUploadItem {
+  posicao: number;
+  nome: string;
+  setor: string;
+  uploads: number;
+}
+
+/** Protocolo sem documentos para listagem */
+export interface ProtocoloSemDocs {
+  id: string;
+  numero: string;
+  assunto: string | null;
+  setorDestino: string | null;
+  diasSemDocumento: number;
+}
+
+/** Dados completos do dashboard */
+export interface DashboardData {
+  kpis: DashboardKpi[];
+  uploadsPeriodo: UploadsPeriodoItem[];
+  docsPorTipo: DocsPorTipoItem[];
+  tramitacaoPorSetor: TramitacaoSetorItem[];
+  rankingUploads: RankingUploadItem[];
+  protocolosSemDocs: ProtocoloSemDocs[];
+}
+
+// ============================================
+// Administradores (Semana 9)
+// ============================================
+
+/** Administrador do GED */
+export interface AdminUser {
+  id: string;
+  nome: string;
+  email: string;
+  setor: string;
+  gedRole: 'super_admin' | 'admin';
+  ativo: boolean;
+  adicionadoEm: string;
+  adicionadoPor: string;
+}
+
+// ============================================
+// Logs de Atividade (Semana 9)
+// ============================================
+
+export type LogAction =
+  | 'LOGIN'
+  | 'UPLOAD'
+  | 'DELETE'
+  | 'EDIT'
+  | 'CREATE'
+  | 'TRAMITAR'
+  | 'EXPORT'
+  | 'ADMIN_CHANGE';
+
+/** Entrada de log de atividade */
+export interface ActivityLog {
+  id: string;
+  acao: LogAction;
+  descricao: string;
+  usuarioNome: string;
+  usuarioEmail: string;
+  setor: string;
+  recurso: string | null;
+  recursoId: string | null;
+  detalhes: Record<string, string> | null;
+  ip: string | null;
+  criadoEm: string;
+}
+
 // ============================================
 // Upload de documentos (Semana 6)
 // ============================================

@@ -18,6 +18,7 @@ import {
   List,
 } from 'lucide-react';
 import { ProtocoloFilters } from './ProtocoloFilters';
+import { ProtocoloInternoTable } from './ProtocoloInternoTable';
 import { ProtocoloSearchBar } from './ProtocoloSearchBar';
 import { ProtocoloTable } from './ProtocoloTable';
 
@@ -148,33 +149,43 @@ export function ProtocoloTabs() {
           ))}
         </TabsList>
 
-        <div className="mt-4 space-y-3">
-          <ProtocoloSearchBar
-            value={filters.busca}
-            onSearch={handleSearch}
-            scope={searchScope}
-            onScopeChange={handleScopeChange}
-          />
+        {filters.tab !== 'internals' && (
+          <div className="mt-4 space-y-3">
+            <ProtocoloSearchBar
+              value={filters.busca}
+              onSearch={handleSearch}
+              scope={searchScope}
+              onScopeChange={handleScopeChange}
+            />
 
-          <ProtocoloFilters
-            status={filters.status}
-            setor={filters.setor}
-            periodo={filters.periodo}
-            onStatusChange={handleStatusChange}
-            onSetorChange={handleSetorChange}
-            onPeriodoChange={handlePeriodoChange}
-            onClear={handleClearFilters}
-          />
-        </div>
+            <ProtocoloFilters
+              status={filters.status}
+              setor={filters.setor}
+              periodo={filters.periodo}
+              onStatusChange={handleStatusChange}
+              onSetorChange={handleSetorChange}
+              onPeriodoChange={handlePeriodoChange}
+              onClear={handleClearFilters}
+            />
+          </div>
+        )}
 
-        <TabsContent value={filters.tab} className="mt-4">
-          <ProtocoloTable
-            data={result?.data ?? []}
-            isLoading={isLoading}
-            activeTab={filters.tab}
-            hasFilters={hasFilters}
-          />
+        <TabsContent value="internals" className="mt-4">
+          <ProtocoloInternoTable />
         </TabsContent>
+
+        {tabs
+          .filter((t) => t.value !== 'internals')
+          .map((tab) => (
+            <TabsContent key={tab.value} value={tab.value} className="mt-4">
+              <ProtocoloTable
+                data={result?.data ?? []}
+                isLoading={isLoading}
+                activeTab={filters.tab}
+                hasFilters={hasFilters}
+              />
+            </TabsContent>
+          ))}
       </Tabs>
 
       {result && result.meta.total_pages > 1 && (

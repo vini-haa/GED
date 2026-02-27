@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { GlobalSearchBar } from '@/components/layout/GlobalSearchBar';
+import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 
 export function AppHeader() {
@@ -23,7 +23,8 @@ export function AppHeader() {
       <SidebarTrigger className="-ml-1" />
       <Separator orientation="vertical" className="mr-2 h-4" />
       <div className="flex w-full flex-1 items-center gap-4">
-        <GlobalSearchBar />
+        <div className="flex-1" />
+        <ThemeToggle />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-8 w-8 rounded-full">
@@ -34,7 +35,7 @@ export function AppHeader() {
                     alt="User Avatar"
                   />
                 )}
-                <AvatarFallback>VS</AvatarFallback>
+                <AvatarFallback>ST</AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
@@ -42,10 +43,10 @@ export function AppHeader() {
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-medium leading-none">
-                  Vinicius Silva
+                  Suporte TI
                 </p>
                 <p className="text-xs leading-none text-muted-foreground">
-                  vinicius@fadex.org.br
+                  suporteti@fadex.org.br
                 </p>
               </div>
             </DropdownMenuLabel>

@@ -20,12 +20,12 @@ const GED_ROLE_HIERARCHY: Record<GedRole, number> = {
 
 export const mockUser: User = {
   id: 'usr_1',
-  name: 'Vinicius Silva',
-  email: 'vinicius@fadex.org.br',
+  name: 'Suporte TI',
+  email: 'suporteti@fadex.org.br',
   role: 'MEMBER',
   codSetor: 5,
   nomeSetor: 'Gerência de TI',
-  gedRole: 'admin',
+  gedRole: 'super_admin',
 };
 
 export function getCurrentUser(): User {

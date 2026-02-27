@@ -14,6 +14,8 @@ import { ProtocoloDetails } from '@/components/protocolo/ProtocoloDetails';
 import { DocumentoList } from '@/components/protocolo/DocumentoList';
 import { ObservacaoList } from '@/components/protocolo/ObservacaoList';
 import { TramitacaoTimeline } from '@/components/protocolo/TramitacaoTimeline';
+import { DossieExportButton } from '@/components/protocolo/DossieExportButton';
+import { DownloadZipButton } from '@/components/protocolo/DownloadZipButton';
 import { useProtocoloDetalhes } from '@/hooks/use-documentos';
 import { useObservacoes } from '@/hooks/use-observacoes';
 
@@ -75,6 +77,15 @@ export default function ProtocoloDetalhesPage({ params }: PageProps) {
   return (
     <div className="space-y-6">
       <ProtocoloDetails protocol={data.protocolo} />
+
+      {/* Ações de exportação */}
+      <div className="flex items-center gap-3">
+        <DossieExportButton protocoloSagi={protocoloSagi} />
+        <DownloadZipButton
+          protocoloSagi={protocoloSagi}
+          documentCount={data.documentos.length}
+        />
+      </div>
 
       <Tabs defaultValue="documentos">
         <TabsList>

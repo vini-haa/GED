@@ -13,6 +13,7 @@ import type {
   TramitacaoInterna,
   StatusProtocoloInterno,
   CreateProtocoloInternoRequest,
+  UpdateProtocoloInternoRequest,
   PaginatedResult,
 } from '@/lib/types';
 
@@ -78,6 +79,27 @@ async function createProtocoloInterno(
 
   localProtocolos = [novo, ...localProtocolos];
   return novo;
+}
+
+async function updateProtocoloInterno(
+  params: UpdateProtocoloInternoRequest
+): Promise<ProtocoloInterno> {
+  await new Promise((resolve) => setTimeout(resolve, 300));
+
+  localProtocolos = localProtocolos.map((p) =>
+    p.id === params.id
+      ? {
+          ...p,
+          assunto: params.assunto,
+          descricao: params.descricao ?? null,
+          atualizadoEm: new Date().toISOString(),
+        }
+      : p
+  );
+
+  const updated = localProtocolos.find((p) => p.id === params.id);
+  if (!updated) throw new Error('Protocolo não encontrado');
+  return updated;
 }
 
 async function updateStatusProtocoloInterno(params: {
@@ -180,6 +202,20 @@ export function useCreateProtocoloInterno() {
     mutationFn: createProtocoloInterno,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['protocolos-internos'] });
+    },
+  });
+}
+
+export function useUpdateProtocoloInterno() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: updateProtocoloInterno,
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['protocolos-internos'] });
+      queryClient.invalidateQueries({
+        queryKey: ['protocolo-interno', variables.id],
+      });
     },
   });
 }
