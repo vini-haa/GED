@@ -12,6 +12,16 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const activateAdmin = `-- name: ActivateAdmin :exec
+UPDATE admins SET ativo = true, atualizado_em = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) ActivateAdmin(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, activateAdmin, id)
+	return err
+}
+
 const countAdmins = `-- name: CountAdmins :one
 SELECT COUNT(*) FROM admins
 `
@@ -74,6 +84,48 @@ WHERE email = $1 AND ativo = true
 
 func (q *Queries) GetAdminByEmail(ctx context.Context, email string) (Admin, error) {
 	row := q.db.QueryRow(ctx, getAdminByEmail, email)
+	var i Admin
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Nome,
+		&i.Role,
+		&i.Ativo,
+		&i.CriadoPor,
+		&i.CriadoEm,
+		&i.AtualizadoEm,
+	)
+	return i, err
+}
+
+const getAdminByEmailAny = `-- name: GetAdminByEmailAny :one
+SELECT id, email, nome, role, ativo, criado_por, criado_em, atualizado_em FROM admins
+WHERE email = $1
+`
+
+func (q *Queries) GetAdminByEmailAny(ctx context.Context, email string) (Admin, error) {
+	row := q.db.QueryRow(ctx, getAdminByEmailAny, email)
+	var i Admin
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Nome,
+		&i.Role,
+		&i.Ativo,
+		&i.CriadoPor,
+		&i.CriadoEm,
+		&i.AtualizadoEm,
+	)
+	return i, err
+}
+
+const getAdminByID = `-- name: GetAdminByID :one
+SELECT id, email, nome, role, ativo, criado_por, criado_em, atualizado_em FROM admins
+WHERE id = $1
+`
+
+func (q *Queries) GetAdminByID(ctx context.Context, id uuid.UUID) (Admin, error) {
+	row := q.db.QueryRow(ctx, getAdminByID, id)
 	var i Admin
 	err := row.Scan(
 		&i.ID,

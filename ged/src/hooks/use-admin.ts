@@ -1,43 +1,35 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { mockAdmins, mockActivityLogs } from '@/lib/mock-admin';
+import { apiClient } from '@/lib/api-client';
 import type { AdminUser, ActivityLog } from '@/lib/types';
 
 // ============================================
-// Fetch mocks — TODO: substituir por apiClient
+// Fetch — chamada à API Go real
+// Endpoints: GET/POST/DELETE /api/admin/admins, GET /api/admin/logs
 // ============================================
 
 async function fetchAdmins(): Promise<AdminUser[]> {
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  return mockAdmins;
+  return apiClient.get<AdminUser[]>('/admin/admins');
 }
 
-async function addAdmin(_data: { email: string; nome: string; setor: string }): Promise<AdminUser> {
-  await new Promise((resolve) => setTimeout(resolve, 600));
-  return {
-    id: `adm_${Date.now()}`,
-    nome: _data.nome,
-    email: _data.email,
-    setor: _data.setor,
-    gedRole: 'admin',
-    ativo: true,
-    adicionadoEm: new Date().toISOString(),
-    adicionadoPor: 'suporteti@fadex.org.br',
-  };
+async function addAdmin(data: { email: string; nome: string; setor: string }): Promise<AdminUser> {
+  return apiClient.post<AdminUser>('/admin/admins', data);
 }
 
-async function removeAdmin(_id: string): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 400));
+async function removeAdmin(id: string): Promise<void> {
+  await apiClient.delete(`/admin/admins/${id}`);
 }
 
-async function toggleAdmin(_id: string): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 400));
+async function toggleAdmin(id: string): Promise<void> {
+  await apiClient.patch(`/admin/admins/${id}/toggle`, {});
 }
 
 async function fetchActivityLogs(): Promise<ActivityLog[]> {
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  return mockActivityLogs;
+  const resp = await apiClient.get<{ data: ActivityLog[]; pagination: unknown }>(
+    '/admin/logs'
+  );
+  return resp.data;
 }
 
 // ============================================
@@ -48,6 +40,7 @@ export function useAdmins() {
   return useQuery({
     queryKey: ['admins'],
     queryFn: fetchAdmins,
+    retry: false,
   });
 }
 
@@ -85,5 +78,6 @@ export function useActivityLogs() {
   return useQuery({
     queryKey: ['activity-logs'],
     queryFn: fetchActivityLogs,
+    retry: false,
   });
 }

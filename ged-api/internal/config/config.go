@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 )
@@ -23,8 +24,12 @@ type Config struct {
 	GEDSuperAdminEmail string
 
 	// Google Drive
-	GoogleCredentialsFile string
-	GoogleDriveRootFolder string
+	GoogleCredentialsFile  string
+	GoogleDriveRootFolder  string
+	GoogleSharedDriveID    string
+
+	// Upload
+	MaxFileSizeMB int
 
 	// Server
 	Port       string
@@ -47,8 +52,11 @@ func Load() (*Config, error) {
 		NextAuthSecret:     os.Getenv("NEXTAUTH_SECRET"),
 		GEDSuperAdminEmail: getEnvOrDefault("GED_SUPER_ADMIN_EMAIL", "suporteti@fadex.org.br"),
 
-		GoogleCredentialsFile: getEnvOrDefault("GOOGLE_APPLICATION_CREDENTIALS", "./credentials.json"),
-		GoogleDriveRootFolder: os.Getenv("GOOGLE_DRIVE_ROOT_FOLDER_ID"),
+		GoogleCredentialsFile:  getEnvOrDefault("GOOGLE_APPLICATION_CREDENTIALS", "./credentials.json"),
+		GoogleDriveRootFolder:  os.Getenv("GOOGLE_DRIVE_ROOT_FOLDER_ID"),
+		GoogleSharedDriveID:    os.Getenv("GOOGLE_SHARED_DRIVE_ID"),
+
+		MaxFileSizeMB: getEnvOrDefaultInt("MAX_FILE_SIZE_MB", 50),
 
 		Port:       getEnvOrDefault("PORT", "4017"),
 		CORSOrigin: getEnvOrDefault("CORS_ORIGIN", "http://localhost:4016"),
@@ -72,6 +80,15 @@ func (c *Config) SAGIConnectionString() string {
 func getEnvOrDefault(key, defaultValue string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return defaultValue
+}
+
+func getEnvOrDefaultInt(key string, defaultValue int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
 	}
 	return defaultValue
 }

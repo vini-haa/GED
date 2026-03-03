@@ -18,35 +18,45 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import type { Protocol, ProtocolStatus, ProtocolTab } from '@/lib/types';
+import type { Protocol, ProtocolTab } from '@/lib/types';
+import { formatSectorName } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   AlertTriangle,
   Eye,
   FileText,
+  FolderKanban,
   Inbox,
   MoreHorizontal,
   Paperclip,
 } from 'lucide-react';
 import Link from 'next/link';
 
-const statusVariantMap: Record<
-  ProtocolStatus,
-  'success' | 'warning' | 'default' | 'destructive'
-> = {
-  Concluído: 'success',
-  Pendente: 'warning',
-  'Em Andamento': 'default',
-  Cancelado: 'destructive',
-};
+function getStatusVariant(
+  status: string
+): 'success' | 'warning' | 'default' | 'destructive' | 'secondary' {
+  switch (status) {
+    case 'Finalizado':
+      return 'success';
+    case 'Em Análise':
+      return 'warning';
+    case 'Cancelado':
+      return 'destructive';
+    case 'Arquivado':
+      return 'secondary';
+    case 'Em Tramitação':
+    default:
+      return 'default';
+  }
+}
 
 const emptyMessageMap: Record<ProtocolTab, string> = {
-  'my-sector': 'Nenhum protocolo vinculado ao seu setor.',
-  recents: 'Nenhum protocolo recente encontrado.',
-  'no-docs': 'Todos os protocolos possuem documentos anexados.',
-  internals: 'Nenhum protocolo interno cadastrado. Disponível na Semana 6.',
-  all: 'Nenhum protocolo encontrado.',
+  meu_setor: 'Nenhum protocolo vinculado ao seu setor.',
+  recentes: 'Nenhum protocolo recente encontrado.',
+  sem_docs: 'Todos os protocolos possuem documentos anexados.',
+  internos: 'Nenhum protocolo interno cadastrado.',
+  todos: 'Nenhum protocolo encontrado.',
 };
 
 interface ProtocoloTableProps {
@@ -54,10 +64,6 @@ interface ProtocoloTableProps {
   isLoading: boolean;
   activeTab: ProtocolTab;
   hasFilters: boolean;
-}
-
-function formatProtocolNumber(numero: number, ano: number): string {
-  return `${String(numero).padStart(5, '0')}/${ano}`;
 }
 
 export function ProtocoloTable({
@@ -76,6 +82,7 @@ export function ProtocoloTable({
           >
             <Skeleton className="h-5 w-24" />
             <Skeleton className="h-5 flex-1" />
+            <Skeleton className="hidden h-5 w-28 lg:block" />
             <Skeleton className="hidden h-5 w-32 md:block" />
             <Skeleton className="h-5 w-20" />
             <Skeleton className="hidden h-5 w-10 sm:block" />
@@ -107,6 +114,9 @@ export function ProtocoloTable({
           <TableRow className="hover:!bg-transparent">
             <TableHead>Protocolo</TableHead>
             <TableHead>Assunto</TableHead>
+            <TableHead className="hidden lg:table-cell">
+              Projeto
+            </TableHead>
             <TableHead className="hidden md:table-cell">
               Setor Destino
             </TableHead>
@@ -115,96 +125,100 @@ export function ProtocoloTable({
               Docs
             </TableHead>
             <TableHead className="hidden sm:table-cell">
-              Última Atividade
+              Ultima Atividade
             </TableHead>
             <TableHead>
-              <span className="sr-only">Ações</span>
+              <span className="sr-only">Acoes</span>
             </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.map((protocol) => {
-            const isRecent =
-              new Date().getTime() -
-                new Date(protocol.lastUpdated).getTime() <
-              24 * 60 * 60 * 1000;
-
-            return (
-              <TableRow
-                key={protocol.id}
-                className="!border-border/30 hover:!bg-muted/20"
-              >
-                <TableCell className="font-medium">
-                  <Link
-                    href={`/protocolo/${protocol.numeroProtocolo}/${protocol.anoProtocolo}`}
-                    className="hover:underline"
-                  >
-                    {formatProtocolNumber(
-                      protocol.numeroProtocolo,
-                      protocol.anoProtocolo
-                    )}
-                  </Link>
-                  {isRecent && (
-                    <span className="ml-2 inline-block h-2 w-2 rounded-full bg-blue-500" />
-                  )}
-                </TableCell>
-                <TableCell className="max-w-[200px] truncate">
-                  {protocol.assunto ?? '—'}
-                </TableCell>
-                <TableCell className="hidden md:table-cell">
-                  {protocol.setorDestino ?? '—'}
-                </TableCell>
-                <TableCell className="text-center">
-                  <Badge variant={statusVariantMap[protocol.situacao]}>
-                    {protocol.situacao}
-                  </Badge>
-                </TableCell>
-                <TableCell className="hidden sm:table-cell text-center">
-                  <span className="inline-flex items-center gap-1">
-                    {protocol.documentCount}
-                    {protocol.documentCount === 0 && (
-                      <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
-                    )}
+          {data.map((protocol) => (
+            <TableRow
+              key={protocol.id}
+              className="!border-border/30 hover:!bg-muted/20"
+            >
+              <TableCell className="font-medium">
+                <Link
+                  href={`/protocolo/sagi/${protocol.id}`}
+                  className="hover:underline"
+                >
+                  {protocol.numero_protocolo}
+                </Link>
+                {protocol.is_new && (
+                  <span className="ml-2 inline-block h-2 w-2 rounded-full bg-blue-500" />
+                )}
+              </TableCell>
+              <TableCell className="max-w-[200px] truncate">
+                {protocol.assunto ?? '—'}
+              </TableCell>
+              <TableCell className="hidden lg:table-cell max-w-[180px]">
+                {protocol.nome_projeto ? (
+                  <span className="block truncate" title={protocol.nome_projeto}>
+                    {protocol.nome_projeto}
                   </span>
-                </TableCell>
-                <TableCell className="hidden sm:table-cell text-muted-foreground">
-                  {formatDistanceToNow(new Date(protocol.lastUpdated), {
-                    addSuffix: true,
-                    locale: ptBR,
-                  })}
-                </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        aria-haspopup="true"
-                        size="icon"
-                        variant="ghost"
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </TableCell>
+              <TableCell className="hidden md:table-cell">
+                {formatSectorName(protocol.nome_setor_atual)}
+              </TableCell>
+              <TableCell className="text-center">
+                <Badge variant={getStatusVariant(protocol.status)}>
+                  {protocol.status}
+                </Badge>
+              </TableCell>
+              <TableCell className="hidden sm:table-cell text-center">
+                <span className="inline-flex items-center gap-1">
+                  {protocol.doc_count}
+                  {protocol.doc_count === 0 && (
+                    <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                  )}
+                </span>
+              </TableCell>
+              <TableCell className="hidden sm:table-cell text-muted-foreground">
+                {protocol.data_chegada_setor
+                  ? formatDistanceToNow(
+                      new Date(protocol.data_chegada_setor),
+                      {
+                        addSuffix: true,
+                        locale: ptBR,
+                      }
+                    )
+                  : '—'}
+              </TableCell>
+              <TableCell>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      aria-haspopup="true"
+                      size="icon"
+                      variant="ghost"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                      <span className="sr-only">Abrir menu</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Acoes</DropdownMenuLabel>
+                    <DropdownMenuItem asChild>
+                      <Link
+                        href={`/protocolo/sagi/${protocol.id}`}
                       >
-                        <MoreHorizontal className="h-4 w-4" />
-                        <span className="sr-only">Abrir menu</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                      <DropdownMenuItem asChild>
-                        <Link
-                          href={`/protocolo/${protocol.numeroProtocolo}/${protocol.anoProtocolo}`}
-                        >
-                          <Eye className="mr-2 h-4 w-4" />
-                          Ver Detalhes
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Paperclip className="mr-2 h-4 w-4" />
-                        Anexar Documento
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            );
-          })}
+                        <Eye className="mr-2 h-4 w-4" />
+                        Ver Detalhes
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>
+                      <Paperclip className="mr-2 h-4 w-4" />
+                      Anexar Documento
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableCell>
+            </TableRow>
+          ))}
         </TableBody>
       </Table>
     </div>

@@ -3,37 +3,37 @@
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ArrowLeft, Calendar, Building2, FolderKanban, FileText, MapPin } from 'lucide-react';
+import { ArrowLeft, Calendar, Building2, FolderKanban, FileText, MapPin, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import type { Protocol, ProtocolStatus } from '@/lib/types';
+import type { ProtocoloDetalhe } from '@/lib/types';
+import { formatSectorName } from '@/lib/types';
 
 const statusVariantMap: Record<
-  ProtocolStatus,
-  'success' | 'warning' | 'default' | 'destructive'
+  string,
+  'success' | 'warning' | 'default' | 'destructive' | 'secondary'
 > = {
-  Concluído: 'success',
-  Pendente: 'warning',
-  'Em Andamento': 'default',
+  'Em Tramitação': 'default',
+  'Em Análise': 'warning',
+  Arquivado: 'secondary',
+  Finalizado: 'success',
   Cancelado: 'destructive',
 };
 
-function formatProtocolNumber(numero: number, ano: number): string {
-  return `${String(numero).padStart(5, '0')}/${ano}`;
-}
-
 interface ProtocoloDetailsProps {
-  protocol: Protocol;
+  protocol: ProtocoloDetalhe;
 }
 
 export function ProtocoloDetails({ protocol }: ProtocoloDetailsProps) {
   const router = useRouter();
 
-  const dataFormatada = format(
-    new Date(protocol.dataProtocolo),
-    "dd/MM/yyyy 'às' HH:mm",
-    { locale: ptBR }
-  );
+  const dataFormatada = protocol.data_criacao
+    ? format(
+        new Date(protocol.data_criacao),
+        "dd/MM/yyyy 'às' HH:mm",
+        { locale: ptBR }
+      )
+    : '—';
 
   return (
     <div className="space-y-4">
@@ -48,10 +48,10 @@ export function ProtocoloDetails({ protocol }: ProtocoloDetailsProps) {
         </Button>
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold tracking-tight">
-            Protocolo {formatProtocolNumber(protocol.numeroProtocolo, protocol.anoProtocolo)}
+            Protocolo {protocol.numero_protocolo}
           </h1>
-          <Badge variant={statusVariantMap[protocol.situacao]}>
-            {protocol.situacao}
+          <Badge variant={statusVariantMap[protocol.status] ?? 'default'}>
+            {protocol.status}
           </Badge>
         </div>
       </div>
@@ -61,10 +61,10 @@ export function ProtocoloDetails({ protocol }: ProtocoloDetailsProps) {
           <div className="space-y-1">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <FileText className="h-3.5 w-3.5" />
-              Número / Ano
+              Protocolo
             </div>
             <p className="text-sm font-medium">
-              {formatProtocolNumber(protocol.numeroProtocolo, protocol.anoProtocolo)}
+              {protocol.numero_protocolo}
             </p>
           </div>
 
@@ -79,20 +79,20 @@ export function ProtocoloDetails({ protocol }: ProtocoloDetailsProps) {
           <div className="space-y-1">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Building2 className="h-3.5 w-3.5" />
-              Setor Origem
+              Setor Atual
             </div>
             <p className="text-sm font-medium">
-              {protocol.setorOrigem ?? '—'}
+              {formatSectorName(protocol.nome_setor_atual)}
             </p>
           </div>
 
           <div className="space-y-1">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <MapPin className="h-3.5 w-3.5" />
-              Setor Destino
+              <User className="h-3.5 w-3.5" />
+              Interessado
             </div>
             <p className="text-sm font-medium">
-              {protocol.setorDestino ?? '—'}
+              {protocol.nome_interessado ?? '—'}
             </p>
           </div>
 
@@ -102,14 +102,14 @@ export function ProtocoloDetails({ protocol }: ProtocoloDetailsProps) {
               Projeto
             </div>
             <p className="text-sm font-medium">
-              {protocol.projetoDescricao ?? '—'}
+              {protocol.nome_projeto ?? '—'}
             </p>
           </div>
 
-          {protocol.numeroConvenio && (
+          {protocol.codigo_convenio && (
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Convênio</p>
-              <p className="text-sm font-medium">{protocol.numeroConvenio}</p>
+              <p className="text-sm font-medium">{protocol.codigo_convenio}</p>
             </div>
           )}
         </div>

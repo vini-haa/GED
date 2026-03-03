@@ -1,8 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
+import { useState, useEffect } from 'react';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -17,16 +15,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useDeleteDocumento } from '@/hooks/use-documentos';
+import { toast } from '@/hooks/use-toast';
 import type { Documento } from '@/lib/types';
-
-const schema = z.object({
-  motivoExclusao: z
-    .string()
-    .min(10, 'Justificativa deve ter pelo menos 10 caracteres')
-    .max(500, 'Justificativa deve ter no máximo 500 caracteres'),
-});
-
-type FormData = z.infer<typeof schema>;
+import type { ApiError } from '@/lib/api-client';
 
 interface DeleteModalProps {
   open: boolean;
@@ -40,34 +31,48 @@ export function DeleteModal({
   documento,
 }: DeleteModalProps) {
   const deleteMutation = useDeleteDocumento();
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<FormData>({
-    defaultValues: {
-      motivoExclusao: '',
-    },
-  });
+  const [motivo, setMotivo] = useState('');
+  const [erro, setErro] = useState('');
 
   useEffect(() => {
     if (open) {
-      reset({ motivoExclusao: '' });
+      setMotivo('');
+      setErro('');
     }
-  }, [open, reset]);
+  }, [open]);
 
-  function onSubmit(data: FormData) {
+  function handleDelete() {
     if (!documento) return;
 
-    const parsed = schema.safeParse(data);
-    if (!parsed.success) return;
+    const trimmed = motivo.trim();
+    if (trimmed.length < 3) {
+      setErro('Justificativa deve ter pelo menos 3 caracteres');
+      return;
+    }
+    if (trimmed.length > 500) {
+      setErro('Justificativa deve ter no máximo 500 caracteres');
+      return;
+    }
 
+    setErro('');
     deleteMutation.mutate(
-      { id: documento.id, motivo: parsed.data.motivoExclusao },
+      { id: documento.id, motivo_exclusao: trimmed },
       {
-        onSuccess: () => onOpenChange(false),
+        onSuccess: () => {
+          toast({
+            title: 'Documento excluído',
+            description: 'O documento foi excluído com sucesso.',
+          });
+          onOpenChange(false);
+        },
+        onError: (error) => {
+          const apiError = error as ApiError;
+          toast({
+            title: 'Erro ao excluir',
+            description: apiError?.message || 'Não foi possível excluir o documento.',
+            variant: 'destructive',
+          });
+        },
       }
     );
   }
@@ -91,16 +96,16 @@ export function DeleteModal({
 
         {documento && (
           <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
-            <p className="text-sm font-medium">{documento.nomeArquivo}</p>
-            {documento.tipoDocumentoNome && (
+            <p className="text-sm font-medium">{documento.nome_arquivo}</p>
+            {documento.tipo_documento_nome && (
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Tipo: {documento.tipoDocumentoNome}
+                Tipo: {documento.tipo_documento_nome}
               </p>
             )}
           </div>
         )}
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="motivoExclusao">
               Justificativa <span className="text-destructive">*</span>
@@ -109,12 +114,14 @@ export function DeleteModal({
               id="motivoExclusao"
               placeholder="Informe o motivo da exclusão deste documento..."
               rows={3}
-              {...register('motivoExclusao')}
+              value={motivo}
+              onChange={(e) => {
+                setMotivo(e.target.value);
+                if (erro) setErro('');
+              }}
             />
-            {errors.motivoExclusao && (
-              <p className="text-sm text-destructive">
-                {errors.motivoExclusao.message}
-              </p>
+            {erro && (
+              <p className="text-sm text-destructive">{erro}</p>
             )}
           </div>
 
@@ -128,9 +135,10 @@ export function DeleteModal({
               Cancelar
             </Button>
             <Button
-              type="submit"
+              type="button"
               variant="destructive"
               disabled={deleteMutation.isPending}
+              onClick={handleDelete}
             >
               {deleteMutation.isPending && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -138,7 +146,7 @@ export function DeleteModal({
               Excluir
             </Button>
           </DialogFooter>
-        </form>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -31,7 +31,21 @@ export function ChartUploadsPeriodo({
     );
   }
 
-  if (!data || data.length === 0) return null;
+  if (!data || data.length === 0) {
+    return (
+      <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+        <h3 className="text-sm font-medium">Uploads e Protocolos por Dia</h3>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Evolução nos últimos 30 dias
+        </p>
+        <div className="mt-4 flex h-[280px] items-center justify-center">
+          <p className="text-sm text-muted-foreground">
+            Nenhum upload registrado no período
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-xl border border-border/50 bg-card/50 p-4">

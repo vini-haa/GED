@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { format, formatDistanceToNow, differenceInDays, differenceInHours } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   ArrowLeft,
@@ -31,25 +31,19 @@ import { TramitarModal } from '@/components/protocolo-interno/TramitarModal';
 import { EditarProtocoloModal } from '@/components/protocolo-interno/EditarProtocoloModal';
 import { DocumentoList } from '@/components/protocolo/DocumentoList';
 import { ObservacaoList } from '@/components/protocolo/ObservacaoList';
-import { useProtocoloInternoDetail } from '@/hooks/use-protocolos-internos';
+import {
+  useProtocoloInternoDetail,
+  useTramitacaoInterna,
+} from '@/hooks/use-protocolos-internos';
 import { useObservacoes } from '@/hooks/use-observacoes';
 import { useDocumentos } from '@/hooks/use-documentos';
 import { usePermissions } from '@/hooks/use-permissions';
-import type { TramitacaoInterna } from '@/lib/types';
+import { formatSectorName } from '@/lib/types';
 
-function formatPermanencia(fromDate: string, toDate: string | null): string {
-  const from = new Date(fromDate);
-  const to = toDate ? new Date(toDate) : new Date();
-
-  const days = differenceInDays(to, from);
-  const hours = differenceInHours(to, from) % 24;
-
-  if (days === 0) {
-    if (hours === 0) return 'Menos de 1 hora';
-    return `${hours}h`;
-  }
-  if (days === 1) return hours > 0 ? `1 dia e ${hours}h` : '1 dia';
-  return `${days} dias`;
+function formatPermanenciaDias(dias: number): string {
+  if (dias === 0) return 'Menos de 1 dia';
+  if (dias === 1) return '1 dia';
+  return `${dias} dias`;
 }
 
 interface PageProps {
@@ -57,52 +51,30 @@ interface PageProps {
 }
 
 export default function ProtocoloInternoDetalhesPage({ params }: PageProps) {
-  const { id } = params;
-  const { data, isLoading, isError } = useProtocoloInternoDetail(id);
+  const { id: idStr } = params;
+  const id = Number(idStr);
+  const { data: protocolo, isLoading, isError } = useProtocoloInternoDetail(id);
+  const { data: tramitacaoData } = useTramitacaoInterna(id);
   const { isAdmin, canEdit } = usePermissions();
 
-  const protocoloNumero = data?.protocolo.numero ?? '';
-  const { data: documentos } = useDocumentos(protocoloNumero);
-  const { data: observacoes } = useObservacoes(protocoloNumero);
+  const { data: documentos } = useDocumentos('interno', id);
+  const { data: obsResponse } = useObservacoes('interno', id);
 
   const [tramitarOpen, setTramitarOpen] = useState(false);
   const [editarOpen, setEditarOpen] = useState(false);
 
-  // Calcular setor atual
-  const setorAtual = useMemo(() => {
-    if (!data) return null;
-    const { protocolo, tramitacoes } = data;
-    if (tramitacoes.length === 0) return protocolo.setorOrigem;
-    return tramitacoes[tramitacoes.length - 1].paraSetor;
-  }, [data]);
-
-  // Timeline items com permanência
-  const timelineItems = useMemo(() => {
-    if (!data?.tramitacoes || data.tramitacoes.length === 0) return [];
-
-    return data.tramitacoes.map((tram, index) => {
-      const isLast = index === data.tramitacoes.length - 1;
-      const nextDate = isLast
-        ? null
-        : data.tramitacoes[index + 1].tramitadoEm;
-
-      return {
-        ...tram,
-        permanencia: formatPermanencia(tram.tramitadoEm, nextDate),
-        isLast,
-      };
-    });
-  }, [data]);
+  const tramitacoes = tramitacaoData?.data ?? [];
+  const resumo = tramitacaoData?.resumo ?? null;
 
   // Verificar se protocolo pode ser tramitado
   const canTramitar = useMemo(() => {
-    if (!data) return false;
-    const { status } = data.protocolo;
+    if (!protocolo) return false;
+    const { status } = protocolo;
     return (
       canEdit &&
-      (status === 'ABERTO' || status === 'EM_ANDAMENTO')
+      (status === 'aberto' || status === 'em_analise')
     );
-  }, [data, canEdit]);
+  }, [protocolo, canEdit]);
 
   if (isLoading) {
     return (
@@ -123,24 +95,22 @@ export default function ProtocoloInternoDetalhesPage({ params }: PageProps) {
     );
   }
 
-  if (isError || !data) {
+  if (isError || !protocolo) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-20">
         <FileText className="h-12 w-12 text-muted-foreground/40" />
         <div className="text-center">
-          <p className="text-lg font-medium">Protocolo não encontrado</p>
+          <p className="text-lg font-medium">Protocolo nao encontrado</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            O protocolo interno solicitado não foi encontrado no sistema.
+            O protocolo interno solicitado nao foi encontrado no sistema.
           </p>
         </div>
         <Button variant="outline" asChild>
-          <Link href="/">Voltar à listagem</Link>
+          <Link href="/">Voltar a listagem</Link>
         </Button>
       </div>
     );
   }
-
-  const { protocolo, tramitacoes } = data;
 
   return (
     <div className="space-y-6">
@@ -155,7 +125,7 @@ export default function ProtocoloInternoDetalhesPage({ params }: PageProps) {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold tracking-tight">
-                {protocolo.numero}
+                {protocolo.protocol_number}
               </h1>
               {isAdmin ? (
                 <StatusDropdown
@@ -167,12 +137,12 @@ export default function ProtocoloInternoDetalhesPage({ params }: PageProps) {
               )}
             </div>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              {protocolo.assunto}
+              {protocolo.subject}
             </p>
           </div>
         </div>
 
-        {/* Ações */}
+        {/* Acoes */}
         {canTramitar && (
           <div className="flex items-center gap-2">
             <Button
@@ -194,22 +164,26 @@ export default function ProtocoloInternoDetalhesPage({ params }: PageProps) {
         )}
       </div>
 
-      {/* Card de informações */}
+      {/* Card de informacoes */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-border/50 bg-card/50 p-4">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <MapPin className="h-3.5 w-3.5" />
-            Setor de Origem
-          </div>
-          <p className="mt-1 text-sm font-medium">{protocolo.setorOrigem}</p>
-        </div>
-
         <div className="rounded-xl border border-border/50 bg-card/50 p-4">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <MapPin className="h-3.5 w-3.5" />
             Setor Atual
           </div>
-          <p className="mt-1 text-sm font-medium">{setorAtual}</p>
+          <p className="mt-1 text-sm font-medium">
+            {formatSectorName(protocolo.current_sector_name)}
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <User className="h-3.5 w-3.5" />
+            Interessado
+          </div>
+          <p className="mt-1 text-sm font-medium">
+            {protocolo.interested || '-'}
+          </p>
         </div>
 
         <div className="rounded-xl border border-border/50 bg-card/50 p-4">
@@ -217,36 +191,50 @@ export default function ProtocoloInternoDetalhesPage({ params }: PageProps) {
             <User className="h-3.5 w-3.5" />
             Criado por
           </div>
-          <p className="mt-1 text-sm font-medium">{protocolo.criadoPorNome}</p>
+          <p className="mt-1 text-sm font-medium">
+            {protocolo.created_by_name}
+          </p>
         </div>
 
         <div className="rounded-xl border border-border/50 bg-card/50 p-4">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Calendar className="h-3.5 w-3.5" />
-            Data de Criação
+            Data de Criacao
           </div>
           <p className="mt-1 text-sm font-medium">
-            {format(new Date(protocolo.criadoEm), 'dd/MM/yyyy', {
-              locale: ptBR,
-            })}
+            {protocolo.created_at
+              ? format(new Date(protocolo.created_at), 'dd/MM/yyyy', {
+                  locale: ptBR,
+                })
+              : '-'}
           </p>
         </div>
       </div>
 
-      {/* Descrição */}
-      {protocolo.descricao && (
-        <div className="rounded-xl border border-border/50 bg-card/50 p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Descrição
-          </p>
-          <p className="mt-2 whitespace-pre-wrap text-sm">
-            {protocolo.descricao}
-          </p>
+      {/* Informacoes adicionais */}
+      {(protocolo.sender || protocolo.project_name) && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {protocolo.sender && (
+            <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Remetente
+              </p>
+              <p className="mt-2 text-sm">{protocolo.sender}</p>
+            </div>
+          )}
+          {protocolo.project_name && (
+            <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Projeto
+              </p>
+              <p className="mt-2 text-sm">{protocolo.project_name}</p>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Resumo de tramitação */}
-      {tramitacoes.length > 0 && setorAtual && (
+      {/* Resumo de tramitacao */}
+      {tramitacoes.length > 0 && (
         <div className="flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
             <MapPin className="h-5 w-5 text-primary" />
@@ -254,58 +242,67 @@ export default function ProtocoloInternoDetalhesPage({ params }: PageProps) {
           <div>
             <p className="text-sm font-medium">
               Protocolo no setor{' '}
-              <span className="text-primary">{setorAtual}</span>
+              <span className="text-primary">
+                {formatSectorName(protocolo.current_sector_name)}
+              </span>
             </p>
-            <p className="text-xs text-muted-foreground">
-              Há{' '}
-              {formatDistanceToNow(
-                new Date(tramitacoes[tramitacoes.length - 1].tramitadoEm),
-                { locale: ptBR }
-              )}{' '}
-              — desde{' '}
-              {format(
-                new Date(tramitacoes[tramitacoes.length - 1].tramitadoEm),
-                "dd/MM/yyyy 'às' HH:mm",
-                { locale: ptBR }
-              )}
-            </p>
+            {tramitacoes.length > 0 && tramitacoes[tramitacoes.length - 1].moved_at && (
+              <p className="text-xs text-muted-foreground">
+                Ha{' '}
+                {formatDistanceToNow(
+                  new Date(tramitacoes[tramitacoes.length - 1].moved_at!),
+                  { locale: ptBR }
+                )}{' '}
+                — desde{' '}
+                {format(
+                  new Date(tramitacoes[tramitacoes.length - 1].moved_at!),
+                  "dd/MM/yyyy 'as' HH:mm",
+                  { locale: ptBR }
+                )}
+              </p>
+            )}
           </div>
         </div>
       )}
 
-      {/* Abas: Documentos, Observações, Tramitação */}
+      {/* Abas: Documentos, Observacoes, Tramitacao */}
       <Tabs defaultValue="documentos">
         <TabsList>
           <TabsTrigger value="documentos" className="gap-1.5">
             <FileText className="h-4 w-4" />
             Documentos
-            {documentos && documentos.length > 0 && (
+            {protocolo.doc_count > 0 && (
               <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                {documentos.length}
+                {protocolo.doc_count}
               </span>
             )}
           </TabsTrigger>
           <TabsTrigger value="observacoes" className="gap-1.5">
             <MessageSquare className="h-4 w-4" />
-            Observações
-            {observacoes && observacoes.length > 0 && (
+            Observacoes
+            {protocolo.obs_count > 0 && (
               <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                {observacoes.length}
+                {protocolo.obs_count}
               </span>
             )}
           </TabsTrigger>
           <TabsTrigger value="tramitacao" className="gap-1.5">
             <ArrowRightLeft className="h-4 w-4" />
-            Tramitação
+            Tramitacao
+            {protocolo.tramitacao_count > 0 && (
+              <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                {protocolo.tramitacao_count}
+              </span>
+            )}
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="documentos" className="mt-4">
-          <DocumentoList protocoloSagi={protocoloNumero} />
+          <DocumentoList source="interno" id={id} />
         </TabsContent>
 
         <TabsContent value="observacoes" className="mt-4">
-          <ObservacaoList protocoloSagi={protocoloNumero} />
+          <ObservacaoList source="interno" id={id} />
         </TabsContent>
 
         <TabsContent value="tramitacao" className="mt-4">
@@ -314,10 +311,10 @@ export default function ProtocoloInternoDetalhesPage({ params }: PageProps) {
               <Route className="h-10 w-10 text-muted-foreground/40" />
               <div className="text-center">
                 <p className="text-sm font-medium">
-                  Sem registro de tramitação
+                  Sem registro de tramitacao
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Este protocolo ainda não foi tramitado para outro setor.
+                  Este protocolo ainda nao foi tramitado para outro setor.
                 </p>
               </div>
             </div>
@@ -327,93 +324,97 @@ export default function ProtocoloInternoDetalhesPage({ params }: PageProps) {
               <div className="absolute left-[11px] top-2 bottom-2 w-px bg-border/60" />
 
               <div className="space-y-6">
-                {timelineItems.map((item) => (
-                  <div key={item.id} className="relative">
-                    {/* Nó do círculo */}
-                    <div
-                      className={`absolute -left-8 top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 ${
-                        item.isLast
-                          ? 'border-primary bg-primary/10'
-                          : 'border-border bg-background'
-                      }`}
-                    >
+                {tramitacoes.map((item, index) => {
+                  const isLast = index === tramitacoes.length - 1;
+                  return (
+                    <div key={item.id} className="relative">
+                      {/* No do circulo */}
                       <div
-                        className={`h-2 w-2 rounded-full ${
-                          item.isLast
-                            ? 'bg-primary animate-pulse'
-                            : 'bg-muted-foreground/40'
+                        className={`absolute -left-8 top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 ${
+                          item.is_current
+                            ? 'border-primary bg-primary/10'
+                            : 'border-border bg-background'
                         }`}
-                      />
-                    </div>
-
-                    {/* Conteúdo */}
-                    <div
-                      className={`rounded-lg border p-3 ${
-                        item.isLast
-                          ? 'border-primary/30 bg-primary/5'
-                          : 'border-border/40'
-                      }`}
-                    >
-                      {/* Setores */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant="outline" className="text-xs">
-                          {item.deSetor}
-                        </Badge>
-                        <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
-                        <Badge
-                          variant={item.isLast ? 'default' : 'outline'}
-                          className="text-xs"
-                        >
-                          {item.paraSetor}
-                        </Badge>
+                      >
+                        <div
+                          className={`h-2 w-2 rounded-full ${
+                            item.is_current
+                              ? 'bg-primary animate-pulse'
+                              : 'bg-muted-foreground/40'
+                          }`}
+                        />
                       </div>
 
-                      {/* Despacho */}
-                      {item.despacho && (
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          {item.despacho}
-                        </p>
-                      )}
+                      {/* Conteudo */}
+                      <div
+                        className={`rounded-lg border p-3 ${
+                          item.is_current
+                            ? 'border-primary/30 bg-primary/5'
+                            : 'border-border/40'
+                        }`}
+                      >
+                        {/* Setores */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="outline" className="text-xs">
+                            {formatSectorName(item.from_sector_name)}
+                          </Badge>
+                          <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                          <Badge
+                            variant={item.is_current ? 'default' : 'outline'}
+                            className="text-xs"
+                          >
+                            {formatSectorName(item.to_sector_name)}
+                          </Badge>
+                        </div>
 
-                      {/* Metadados */}
-                      <div className="mt-2 flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
-                        <span>
-                          {format(
-                            new Date(item.tramitadoEm),
-                            "dd/MM/yyyy 'às' HH:mm",
-                            { locale: ptBR }
+                        {/* Despacho */}
+                        {item.dispatch_note && (
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            {item.dispatch_note}
+                          </p>
+                        )}
+
+                        {/* Metadados */}
+                        <div className="mt-2 flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
+                          {item.moved_at && (
+                            <span>
+                              {format(
+                                new Date(item.moved_at),
+                                "dd/MM/yyyy 'as' HH:mm",
+                                { locale: ptBR }
+                              )}
+                            </span>
                           )}
-                        </span>
-                        <span>·</span>
-                        <span>{item.tramitadoPorNome}</span>
-                        <span>·</span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {item.isLast
-                            ? `Há ${formatPermanencia(item.tramitadoEm, null)} (atual)`
-                            : item.permanencia}
-                        </span>
+                          <span>·</span>
+                          <span>{item.moved_by_name}</span>
+                          <span>·</span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {item.is_current
+                              ? `${formatPermanenciaDias(item.permanencia_dias)} (atual)`
+                              : formatPermanenciaDias(item.permanencia_dias)}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
         </TabsContent>
       </Tabs>
 
-      {/* Modal de tramitação */}
-      {setorAtual && (
-        <TramitarModal
-          open={tramitarOpen}
-          onOpenChange={setTramitarOpen}
-          protocoloInternoId={protocolo.id}
-          setorAtual={setorAtual}
-        />
-      )}
+      {/* Modal de tramitacao */}
+      <TramitarModal
+        open={tramitarOpen}
+        onOpenChange={setTramitarOpen}
+        protocoloInternoId={protocolo.id}
+        setorAtualCodigo={protocolo.current_sector_code}
+        setorAtualNome={protocolo.current_sector_name}
+      />
 
-      {/* Modal de edição */}
+      {/* Modal de edicao */}
       <EditarProtocoloModal
         open={editarOpen}
         onOpenChange={setEditarOpen}

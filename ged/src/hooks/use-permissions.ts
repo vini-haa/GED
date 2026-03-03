@@ -1,11 +1,19 @@
 'use client';
 
 import { useMemo } from 'react';
-import { getCurrentUser, hasPermission } from '@/lib/auth';
-import type { GedRole, User } from '@/lib/auth';
+import { hasRolePermission, mapBackendRole } from '@/lib/auth';
+import type { GedRole } from '@/lib/auth';
+import { useCurrentUser } from '@/hooks/use-user-sector';
 
 interface UsePermissionsReturn {
-  user: User;
+  user: {
+    email: string;
+    nome: string;
+    role: string;
+    gedRole: GedRole;
+    setor: string;
+  } | null;
+  isLoading: boolean;
   role: GedRole;
   isSuperAdmin: boolean;
   isAdmin: boolean;
@@ -21,29 +29,58 @@ interface UsePermissionsReturn {
 }
 
 export function usePermissions(): UsePermissionsReturn {
-  const user = getCurrentUser();
+  const { data: currentUser, isLoading } = useCurrentUser();
 
   return useMemo(() => {
-    const role = user.gedRole;
-    const isSuperAdmin = hasPermission(user, 'super_admin');
-    const isAdmin = hasPermission(user, 'admin');
-    const isOperator = hasPermission(user, 'operator');
-    const isViewer = role === 'viewer';
+    if (!currentUser) {
+      return {
+        user: null,
+        isLoading,
+        role: 'viewer' as GedRole,
+        isSuperAdmin: false,
+        isAdmin: false,
+        isOperator: false,
+        isViewer: true,
+        canManageDocumentTypes: false,
+        canManageAdmins: false,
+        canViewLogs: false,
+        canUpload: false,
+        canDelete: false,
+        canEdit: false,
+        hasRole: () => false,
+      };
+    }
+
+    const gedRole = mapBackendRole(currentUser.role);
+
+    const user = {
+      email: currentUser.email,
+      nome: currentUser.nome,
+      role: currentUser.role,
+      gedRole,
+      setor: currentUser.setor ?? '',
+    };
+
+    const superAdmin = hasRolePermission(gedRole, 'super_admin');
+    const admin = hasRolePermission(gedRole, 'admin');
+    const operator = hasRolePermission(gedRole, 'operator');
 
     return {
       user,
-      role,
-      isSuperAdmin,
-      isAdmin,
-      isOperator: isOperator && !isAdmin,
-      isViewer,
-      canManageDocumentTypes: isAdmin,
-      canManageAdmins: isSuperAdmin,
-      canViewLogs: isAdmin,
-      canUpload: hasPermission(user, 'operator'),
-      canDelete: isAdmin,
-      canEdit: hasPermission(user, 'operator'),
-      hasRole: (requiredRole: GedRole) => hasPermission(user, requiredRole),
+      isLoading,
+      role: gedRole,
+      isSuperAdmin: superAdmin,
+      isAdmin: admin,
+      isOperator: operator && !admin,
+      isViewer: gedRole === 'viewer',
+      canManageDocumentTypes: admin,
+      canManageAdmins: superAdmin,
+      canViewLogs: admin,
+      canUpload: operator,
+      canDelete: admin,
+      canEdit: operator,
+      hasRole: (requiredRole: GedRole) =>
+        hasRolePermission(gedRole, requiredRole),
     };
-  }, [user]);
+  }, [currentUser, isLoading]);
 }

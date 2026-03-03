@@ -1,8 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useMemo } from 'react';
-import { BarChart3, Calendar, Building2, FolderKanban, FileDown, FileSpreadsheet } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import { BarChart3, Calendar, Building2, FolderKanban, FileDown, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -18,7 +17,8 @@ import { ChartTramitacaoSetor } from '@/components/dashboard/ChartTramitacaoSeto
 import { RankingUploads } from '@/components/dashboard/RankingUploads';
 import { ListaProtocolosSemDocs } from '@/components/dashboard/ListaProtocolosSemDocs';
 import { useDashboard } from '@/hooks/use-dashboard';
-import { mockSetores, mockProtocols } from '@/lib/mock-protocols';
+import { useSetores } from '@/hooks/use-protocolos';
+import { toast } from '@/hooks/use-toast';
 import type { DashboardFilters } from '@/lib/types';
 
 const PERIODOS = [
@@ -35,16 +35,77 @@ export default function DashboardPage() {
     projeto: 'all',
   });
 
-  // Projetos distintos extraídos dos protocolos mock
-  const projetos = useMemo(() => {
-    const nomes = new Set<string>();
-    for (const p of mockProtocols) {
-      if (p.projetoDescricao) nomes.add(p.projetoDescricao);
-    }
-    return Array.from(nomes).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-  }, []);
+  const { data: setores = [] } = useSetores();
+
+  // TODO: Substituir por endpoint de projetos quando backend implementar
+  const projetos: string[] = [];
 
   const { data, isLoading } = useDashboard(filters);
+
+  const [exportingPDF, setExportingPDF] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
+
+  const buildExportParams = useCallback(() => {
+    const params = new URLSearchParams();
+    params.set('periodo', filters.periodo);
+    if (filters.setor !== 'all') params.set('setor', filters.setor);
+    if (filters.projeto !== 'all') params.set('projeto', filters.projeto);
+    return params.toString();
+  }, [filters]);
+
+  const handleExport = useCallback(
+    async (format: 'pdf' | 'excel') => {
+      const setLoading = format === 'pdf' ? setExportingPDF : setExportingExcel;
+      setLoading(true);
+
+      try {
+        const token = localStorage.getItem('auth_token');
+        const baseUrl =
+          process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4017/api';
+
+        const response = await fetch(
+          `${baseUrl}/dashboard/export/${format}?${buildExportParams()}`,
+          {
+            headers: {
+              ...(token && { Authorization: `Bearer ${token}` }),
+            },
+          }
+        );
+
+        if (!response.ok) {
+          const errorBody = await response.json().catch(() => null);
+          throw new Error(
+            errorBody?.error?.message || `Erro ${response.status}`
+          );
+        }
+
+        const blob = await response.blob();
+        const contentDisposition = response.headers.get('Content-Disposition');
+        const ext = format === 'pdf' ? 'pdf' : 'xlsx';
+        let fileName = `dashboard_ged_${new Date().toISOString().slice(0, 10)}.${ext}`;
+        if (contentDisposition) {
+          const match = contentDisposition.match(/filename="(.+)"/);
+          if (match) fileName = match[1];
+        }
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : `Erro ao exportar ${format.toUpperCase()}`;
+        toast({ title: 'Erro', description: message, variant: 'destructive' });
+      } finally {
+        setLoading(false);
+      }
+    },
+    [buildExportParams]
+  );
 
   return (
     <div className="space-y-6">
@@ -65,23 +126,29 @@ export default function DashboardPage() {
             variant="outline"
             size="sm"
             className="gap-2"
-            onClick={() => {
-              // TODO: conectar com endpoint real de exportação PDF
-            }}
+            disabled={exportingPDF}
+            onClick={() => handleExport('pdf')}
           >
-            <FileDown className="h-4 w-4" />
-            PDF
+            {exportingPDF ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileDown className="h-4 w-4" />
+            )}
+            {exportingPDF ? 'Gerando...' : 'PDF'}
           </Button>
           <Button
             variant="outline"
             size="sm"
             className="gap-2"
-            onClick={() => {
-              // TODO: conectar com endpoint real de exportação Excel
-            }}
+            disabled={exportingExcel}
+            onClick={() => handleExport('excel')}
           >
-            <FileSpreadsheet className="h-4 w-4" />
-            Excel
+            {exportingExcel ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="h-4 w-4" />
+            )}
+            {exportingExcel ? 'Gerando...' : 'Excel'}
           </Button>
         </div>
       </div>
@@ -127,9 +194,9 @@ export default function DashboardPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os setores</SelectItem>
-              {mockSetores.map((s) => (
-                <SelectItem key={s.codigo} value={s.nome}>
-                  {s.nome}
+              {setores.map((s) => (
+                <SelectItem key={s.codigo} value={s.descricao}>
+                  {s.descricao}
                 </SelectItem>
               ))}
             </SelectContent>

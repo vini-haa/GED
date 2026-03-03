@@ -25,6 +25,7 @@ import {
 import { useUpdateObservacao, useToggleImportante } from '@/hooks/use-observacoes';
 import { usePermissions } from '@/hooks/use-permissions';
 import type { Observacao } from '@/lib/types';
+import { formatSectorName } from '@/lib/types';
 
 const MAX_LENGTH = 2000;
 
@@ -39,24 +40,26 @@ export function ObservacaoCard({ observacao, onDelete }: ObservacaoCardProps) {
   const toggleMutation = useToggleImportante();
 
   const [isEditing, setIsEditing] = useState(false);
-  const [editText, setEditText] = useState(observacao.texto);
+  const [editText, setEditText] = useState(observacao.content);
 
-  const isAuthor = observacao.autorEmail === user.email;
+  const isAuthor = observacao.created_by_email === user?.email;
   const canEdit = isAuthor || canDelete;
   const canMarkImportant = canDelete;
 
-  const timeAgo = formatDistanceToNow(new Date(observacao.criadoEm), {
-    addSuffix: true,
-    locale: ptBR,
-  });
+  const timeAgo = observacao.created_at
+    ? formatDistanceToNow(new Date(observacao.created_at), {
+        addSuffix: true,
+        locale: ptBR,
+      })
+    : '—';
 
-  const initial = observacao.autorNome.charAt(0).toUpperCase();
+  const initial = observacao.created_by_name.charAt(0).toUpperCase();
 
   const handleSave = useCallback(() => {
     if (editText.trim().length === 0 || editText.length > MAX_LENGTH) return;
 
     updateMutation.mutate(
-      { id: observacao.id, texto: editText.trim() },
+      { id: observacao.id, content: editText.trim() },
       {
         onSuccess: () => setIsEditing(false),
       }
@@ -64,9 +67,9 @@ export function ObservacaoCard({ observacao, onDelete }: ObservacaoCardProps) {
   }, [observacao.id, editText, updateMutation]);
 
   const handleCancel = useCallback(() => {
-    setEditText(observacao.texto);
+    setEditText(observacao.content);
     setIsEditing(false);
-  }, [observacao.texto]);
+  }, [observacao.content]);
 
   const handleToggleImportante = useCallback(() => {
     toggleMutation.mutate(observacao.id);
@@ -75,7 +78,7 @@ export function ObservacaoCard({ observacao, onDelete }: ObservacaoCardProps) {
   return (
     <div
       className={`rounded-lg border p-4 transition-colors ${
-        observacao.importante
+        observacao.is_important
           ? 'border-amber-300/60 bg-amber-50/30 dark:border-amber-700/40 dark:bg-amber-950/10'
           : 'border-border/50'
       }`}
@@ -84,7 +87,7 @@ export function ObservacaoCard({ observacao, onDelete }: ObservacaoCardProps) {
         {/* Avatar */}
         <div
           className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-medium ${
-            observacao.importante
+            observacao.is_important
               ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
               : 'bg-muted text-muted-foreground'
           }`}
@@ -92,17 +95,17 @@ export function ObservacaoCard({ observacao, onDelete }: ObservacaoCardProps) {
           {initial}
         </div>
 
-        {/* Conteúdo */}
+        {/* Conteudo */}
         <div className="min-w-0 flex-1">
           {/* Header */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-medium">
-              {observacao.autorNome}
+              {observacao.created_by_name}
             </span>
             <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-              {observacao.autorSetor}
+              {formatSectorName(observacao.created_by_sector)}
             </Badge>
-            {observacao.importante && (
+            {observacao.is_important && (
               <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 text-[10px] px-1.5 py-0">
                 <AlertTriangle className="mr-1 h-3 w-3" />
                 Importante
@@ -110,11 +113,11 @@ export function ObservacaoCard({ observacao, onDelete }: ObservacaoCardProps) {
             )}
             <span className="text-xs text-muted-foreground">
               {timeAgo}
-              {observacao.editadoEm && ' (editado)'}
+              {observacao.updated_at && ' (editado)'}
             </span>
           </div>
 
-          {/* Texto ou edição */}
+          {/* Texto ou edicao */}
           {isEditing ? (
             <div className="mt-2 space-y-2">
               <Textarea
@@ -165,7 +168,7 @@ export function ObservacaoCard({ observacao, onDelete }: ObservacaoCardProps) {
             </div>
           ) : (
             <p className="mt-1 text-sm whitespace-pre-wrap">
-              {observacao.texto}
+              {observacao.content}
             </p>
           )}
         </div>
@@ -186,7 +189,7 @@ export function ObservacaoCard({ observacao, onDelete }: ObservacaoCardProps) {
               {canEdit && (
                 <DropdownMenuItem
                   onClick={() => {
-                    setEditText(observacao.texto);
+                    setEditText(observacao.content);
                     setIsEditing(true);
                   }}
                 >
@@ -196,7 +199,7 @@ export function ObservacaoCard({ observacao, onDelete }: ObservacaoCardProps) {
               )}
               {canMarkImportant && (
                 <DropdownMenuItem onClick={handleToggleImportante}>
-                  {observacao.importante ? (
+                  {observacao.is_important ? (
                     <>
                       <StarOff className="mr-2 h-4 w-4" />
                       Desmarcar importante

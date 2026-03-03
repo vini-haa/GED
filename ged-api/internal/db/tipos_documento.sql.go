@@ -12,6 +12,16 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const activateTipoDocumento = `-- name: ActivateTipoDocumento :exec
+UPDATE tipos_documento SET ativo = true
+WHERE id = $1
+`
+
+func (q *Queries) ActivateTipoDocumento(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, activateTipoDocumento, id)
+	return err
+}
+
 const createTipoDocumento = `-- name: CreateTipoDocumento :one
 INSERT INTO tipos_documento (nome, descricao)
 VALUES ($1, $2)
@@ -62,6 +72,37 @@ func (q *Queries) GetTipoDocumentoByID(ctx context.Context, id uuid.UUID) (Tipos
 		&i.CriadoEm,
 	)
 	return i, err
+}
+
+const listAllTiposDocumento = `-- name: ListAllTiposDocumento :many
+SELECT id, nome, descricao, ativo, criado_em FROM tipos_documento
+ORDER BY nome
+`
+
+func (q *Queries) ListAllTiposDocumento(ctx context.Context) ([]TiposDocumento, error) {
+	rows, err := q.db.Query(ctx, listAllTiposDocumento)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []TiposDocumento{}
+	for rows.Next() {
+		var i TiposDocumento
+		if err := rows.Scan(
+			&i.ID,
+			&i.Nome,
+			&i.Descricao,
+			&i.Ativo,
+			&i.CriadoEm,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listTiposDocumento = `-- name: ListTiposDocumento :many

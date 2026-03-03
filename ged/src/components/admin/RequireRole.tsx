@@ -10,7 +10,11 @@ interface RequireRoleProps {
 }
 
 export function RequireRole({ requiredRole, children }: RequireRoleProps) {
-  const { hasRole } = usePermissions();
+  const { hasRole, isLoading } = usePermissions();
+
+  if (isLoading) {
+    return null;
+  }
 
   if (!hasRole(requiredRole)) {
     return <AccessDenied />;

@@ -6,6 +6,7 @@ import {
   Play,
   CheckCircle2,
   XCircle,
+  Archive,
   Loader2,
   ChevronDown,
 } from 'lucide-react';
@@ -37,28 +38,35 @@ interface StatusConfig {
 }
 
 const STATUS_MAP: Record<StatusProtocoloInterno, StatusConfig> = {
-  ABERTO: {
+  aberto: {
     label: 'Aberto',
     icon: Circle,
     badgeClass:
       'bg-blue-100 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400',
     dotClass: 'bg-blue-500',
   },
-  EM_ANDAMENTO: {
-    label: 'Em Andamento',
+  em_analise: {
+    label: 'Em Analise',
     icon: Play,
     badgeClass:
       'bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400',
     dotClass: 'bg-amber-500',
   },
-  FINALIZADO: {
+  finalizado: {
     label: 'Finalizado',
     icon: CheckCircle2,
     badgeClass:
       'bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400',
     dotClass: 'bg-emerald-500',
   },
-  CANCELADO: {
+  arquivado: {
+    label: 'Arquivado',
+    icon: Archive,
+    badgeClass:
+      'bg-slate-100 text-slate-700 hover:bg-slate-100 dark:bg-slate-900/30 dark:text-slate-400',
+    dotClass: 'bg-slate-500',
+  },
+  cancelado: {
     label: 'Cancelado',
     icon: XCircle,
     badgeClass:
@@ -67,16 +75,17 @@ const STATUS_MAP: Record<StatusProtocoloInterno, StatusConfig> = {
   },
 };
 
-// Regras de transição: status atual → status permitidos
+// Regras de transicao: status atual -> status permitidos
 const TRANSITION_RULES: Record<StatusProtocoloInterno, StatusProtocoloInterno[]> = {
-  ABERTO: ['EM_ANDAMENTO', 'CANCELADO'],
-  EM_ANDAMENTO: ['FINALIZADO', 'CANCELADO'],
-  FINALIZADO: [],
-  CANCELADO: [],
+  aberto: ['em_analise', 'cancelado'],
+  em_analise: ['finalizado', 'arquivado', 'cancelado'],
+  finalizado: [],
+  arquivado: [],
+  cancelado: [],
 };
 
 interface StatusDropdownProps {
-  protocoloId: string;
+  protocoloId: number;
   currentStatus: StatusProtocoloInterno;
   disabled?: boolean;
 }
@@ -96,23 +105,23 @@ export function StatusDropdown({
   const isTerminal = allowedTransitions.length === 0;
 
   const handleSelect = useCallback((newStatus: StatusProtocoloInterno) => {
-    // Status terminais requerem confirmação
-    if (newStatus === 'FINALIZADO' || newStatus === 'CANCELADO') {
+    // Status terminais requerem confirmacao
+    if (newStatus === 'finalizado' || newStatus === 'cancelado' || newStatus === 'arquivado') {
       setConfirmStatus(newStatus);
     } else {
-      updateMutation.mutate({ id: protocoloId, status: newStatus });
+      updateMutation.mutate({ id: protocoloId, data: { status: newStatus } });
     }
   }, [protocoloId, updateMutation]);
 
   const handleConfirm = useCallback(() => {
     if (!confirmStatus) return;
     updateMutation.mutate(
-      { id: protocoloId, status: confirmStatus },
+      { id: protocoloId, data: { status: confirmStatus } },
       { onSuccess: () => setConfirmStatus(null) }
     );
   }, [protocoloId, confirmStatus, updateMutation]);
 
-  // Se não há transições possíveis, exibir apenas badge estático
+  // Se nao ha transicoes possiveis, exibir apenas badge estatico
   if (isTerminal || disabled) {
     return (
       <Badge className={`gap-1.5 ${config.badgeClass}`}>
@@ -150,7 +159,6 @@ export function StatusDropdown({
           <DropdownMenuSeparator />
           {allowedTransitions.map((status) => {
             const targetConfig = STATUS_MAP[status];
-            const TargetIcon = targetConfig.icon;
             return (
               <DropdownMenuItem
                 key={status}
@@ -167,7 +175,7 @@ export function StatusDropdown({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Dialog de confirmação para status terminais */}
+      {/* Dialog de confirmacao para status terminais */}
       <Dialog
         open={!!confirmStatus}
         onOpenChange={(open) => !open && setConfirmStatus(null)}
@@ -175,14 +183,18 @@ export function StatusDropdown({
         <DialogContent className="sm:max-w-[420px]">
           <DialogHeader>
             <DialogTitle>
-              {confirmStatus === 'FINALIZADO'
+              {confirmStatus === 'finalizado'
                 ? 'Finalizar Protocolo'
-                : 'Cancelar Protocolo'}
+                : confirmStatus === 'arquivado'
+                  ? 'Arquivar Protocolo'
+                  : 'Cancelar Protocolo'}
             </DialogTitle>
             <DialogDescription>
-              {confirmStatus === 'FINALIZADO'
-                ? 'Ao finalizar, o protocolo não poderá mais ser tramitado ou ter seu status alterado.'
-                : 'Ao cancelar, o protocolo será marcado como cancelado permanentemente.'}
+              {confirmStatus === 'finalizado'
+                ? 'Ao finalizar, o protocolo nao podera mais ser tramitado ou ter seu status alterado.'
+                : confirmStatus === 'arquivado'
+                  ? 'Ao arquivar, o protocolo sera marcado como arquivado permanentemente.'
+                  : 'Ao cancelar, o protocolo sera marcado como cancelado permanentemente.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -193,7 +205,7 @@ export function StatusDropdown({
                   <Icon className="h-3 w-3" />
                   {config.label}
                 </Badge>
-                <span className="text-muted-foreground">→</span>
+                <span className="text-muted-foreground">&rarr;</span>
                 <Badge
                   className={`gap-1 ${STATUS_MAP[confirmStatus].badgeClass}`}
                 >
@@ -218,7 +230,7 @@ export function StatusDropdown({
             </Button>
             <Button
               variant={
-                confirmStatus === 'CANCELADO' ? 'destructive' : 'default'
+                confirmStatus === 'cancelado' ? 'destructive' : 'default'
               }
               onClick={handleConfirm}
               disabled={updateMutation.isPending}
@@ -226,7 +238,11 @@ export function StatusDropdown({
               {updateMutation.isPending && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
-              {confirmStatus === 'FINALIZADO' ? 'Finalizar' : 'Cancelar Protocolo'}
+              {confirmStatus === 'finalizado'
+                ? 'Finalizar'
+                : confirmStatus === 'arquivado'
+                  ? 'Arquivar'
+                  : 'Cancelar Protocolo'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -235,19 +251,19 @@ export function StatusDropdown({
   );
 }
 
-/** Badge estático de status (para uso em listagens, sem interação) */
+/** Badge estatico de status (para uso em listagens, sem interacao) */
 export function StatusBadge({
   status,
 }: {
   status: StatusProtocoloInterno;
 }) {
   const config = STATUS_MAP[status];
-  const Icon = config.icon;
+  const Icon = config?.icon ?? Circle;
 
   return (
-    <Badge className={`gap-1 ${config.badgeClass}`}>
+    <Badge className={`gap-1 ${config?.badgeClass ?? ''}`}>
       <Icon className="h-3 w-3" />
-      {config.label}
+      {config?.label ?? status}
     </Badge>
   );
 }

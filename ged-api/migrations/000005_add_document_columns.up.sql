@@ -1,0 +1,4 @@
+ALTER TABLE documentos
+  ADD COLUMN IF NOT EXISTS descricao VARCHAR(500),
+  ADD COLUMN IF NOT EXISTS uploaded_by_name VARCHAR(200),
+  ADD COLUMN IF NOT EXISTS google_drive_folder_id VARCHAR(100);

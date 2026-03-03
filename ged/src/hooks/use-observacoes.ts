@@ -1,109 +1,78 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { mockObservacoes } from '@/lib/mock-observacoes';
-import { mockTramitacoes } from '@/lib/mock-tramitacoes';
-import { getCurrentUser } from '@/lib/auth';
-import type { Observacao, TramitacaoSagi } from '@/lib/types';
-
-// Estado local mutável para simular persistência durante a sessão
-let localObservacoes = [...mockObservacoes];
+import { apiClient } from '@/lib/api-client';
+import type {
+  Observacao,
+  ListObservacoesResponse,
+  TramitacaoResponse,
+} from '@/lib/types';
 
 // ============================================
-// Funções de fetch mock
-// TODO: Substituir por chamadas ao apiClient quando a API Go estiver pronta
+// Funções de fetch — chamadas à API Go real
 // ============================================
 
 async function fetchObservacoes(
-  protocoloSagi: string
-): Promise<Observacao[]> {
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  return localObservacoes.filter((o) => o.protocoloSagi === protocoloSagi);
+  source: string,
+  id: number
+): Promise<ListObservacoesResponse> {
+  return apiClient.get<ListObservacoesResponse>(
+    `/protocolos/${source}/${id}/observacoes`
+  );
 }
 
 async function createObservacao(data: {
-  protocoloSagi: string;
-  texto: string;
-  importante: boolean;
+  source: string;
+  id: number;
+  content: string;
+  is_important: boolean;
 }): Promise<Observacao> {
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  const user = getCurrentUser();
-
-  const newObs: Observacao = {
-    id: `obs_${Date.now()}`,
-    protocoloSagi: data.protocoloSagi,
-    texto: data.texto,
-    autorEmail: user.email,
-    autorNome: user.name,
-    autorSetor: user.nomeSetor,
-    importante: data.importante,
-    criadoEm: new Date().toISOString(),
-    editadoEm: null,
-  };
-
-  localObservacoes = [newObs, ...localObservacoes];
-  return newObs;
+  return apiClient.post<Observacao>(
+    `/protocolos/${data.source}/${data.id}/observacoes`,
+    { content: data.content, is_important: data.is_important }
+  );
 }
 
 async function updateObservacao(data: {
   id: string;
-  texto: string;
+  content: string;
 }): Promise<Observacao> {
-  await new Promise((resolve) => setTimeout(resolve, 300));
-
-  localObservacoes = localObservacoes.map((o) =>
-    o.id === data.id
-      ? { ...o, texto: data.texto, editadoEm: new Date().toISOString() }
-      : o
-  );
-
-  const updated = localObservacoes.find((o) => o.id === data.id);
-  if (!updated) throw new Error('Observação não encontrada');
-  return updated;
+  return apiClient.patch<Observacao>(`/observacoes/${data.id}`, {
+    content: data.content,
+  });
 }
 
 async function deleteObservacao(params: {
   id: string;
   motivo: string;
 }): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 400));
-  localObservacoes = localObservacoes.filter((o) => o.id !== params.id);
+  await apiClient.delete(`/observacoes/${params.id}`, {
+    motivo_exclusao: params.motivo,
+  });
 }
 
 async function toggleImportante(id: string): Promise<Observacao> {
-  await new Promise((resolve) => setTimeout(resolve, 300));
-
-  localObservacoes = localObservacoes.map((o) =>
-    o.id === id ? { ...o, importante: !o.importante } : o
-  );
-
-  const toggled = localObservacoes.find((o) => o.id === id);
-  if (!toggled) throw new Error('Observação não encontrada');
-  return toggled;
+  return apiClient.patch<Observacao>(`/observacoes/${id}/importante`, {});
 }
 
 async function fetchTramitacoes(
-  protocoloSagi: string
-): Promise<TramitacaoSagi[]> {
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  return mockTramitacoes
-    .filter((t) => t.protocoloSagi === protocoloSagi)
-    .sort(
-      (a, b) =>
-        new Date(a.tramitadoEm).getTime() -
-        new Date(b.tramitadoEm).getTime()
-    );
+  source: string,
+  id: number
+): Promise<TramitacaoResponse> {
+  return apiClient.get<TramitacaoResponse>(
+    `/protocolos/${source}/${id}/tramitacao`
+  );
 }
 
 // ============================================
 // Hooks exportados
 // ============================================
 
-export function useObservacoes(protocoloSagi: string) {
+export function useObservacoes(source: string, id: number) {
   return useQuery({
-    queryKey: ['observacoes', protocoloSagi],
-    queryFn: () => fetchObservacoes(protocoloSagi),
-    enabled: !!protocoloSagi,
+    queryKey: ['observacoes', source, id],
+    queryFn: () => fetchObservacoes(source, id),
+    enabled: !!id,
   });
 }
 
@@ -112,8 +81,10 @@ export function useCreateObservacao() {
 
   return useMutation({
     mutationFn: createObservacao,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['observacoes'] });
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ['observacoes', variables.source, variables.id],
+      });
     },
   });
 }
@@ -151,10 +122,10 @@ export function useToggleImportante() {
   });
 }
 
-export function useTramitacoes(protocoloSagi: string) {
+export function useTramitacoes(source: string, id: number) {
   return useQuery({
-    queryKey: ['tramitacoes', protocoloSagi],
-    queryFn: () => fetchTramitacoes(protocoloSagi),
-    enabled: !!protocoloSagi,
+    queryKey: ['tramitacoes', source, id],
+    queryFn: () => fetchTramitacoes(source, id),
+    enabled: !!id,
   });
 }

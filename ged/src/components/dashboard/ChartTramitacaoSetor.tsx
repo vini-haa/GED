@@ -31,7 +31,21 @@ export function ChartTramitacaoSetor({
     );
   }
 
-  if (!data || data.length === 0) return null;
+  if (!data || data.length === 0) {
+    return (
+      <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+        <h3 className="text-sm font-medium">Tempo Médio por Setor</h3>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Dias de permanência em cada setor
+        </p>
+        <div className="mt-4 flex h-[320px] items-center justify-center">
+          <p className="text-sm text-muted-foreground">
+            Nenhum dado de tramitação no período
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const media =
     data.reduce((sum, d) => sum + d.tempoMedioDias, 0) / data.length;

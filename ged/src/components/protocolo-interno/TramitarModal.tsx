@@ -27,27 +27,35 @@ import { useTramitarProtocoloInterno } from '@/hooks/use-protocolos-internos';
 import { useSetores } from '@/hooks/use-protocolos';
 
 const schema = z.object({
-  paraSetor: z.string().min(1, 'Selecione o setor de destino'),
-  despacho: z
+  to_sector_code: z
+    .string()
+    .min(1, 'Selecione o setor de destino')
+    .transform((v) => Number(v)),
+  dispatch_note: z
     .string()
     .min(5, 'Despacho deve ter pelo menos 5 caracteres')
-    .max(1000, 'Despacho deve ter no máximo 1000 caracteres'),
+    .max(1000, 'Despacho deve ter no maximo 1000 caracteres'),
 });
 
-type FormData = z.infer<typeof schema>;
+type FormData = {
+  to_sector_code: string;
+  dispatch_note: string;
+};
 
 interface TramitarModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  protocoloInternoId: string;
-  setorAtual: string;
+  protocoloInternoId: number;
+  setorAtualCodigo: number;
+  setorAtualNome: string;
 }
 
 export function TramitarModal({
   open,
   onOpenChange,
   protocoloInternoId,
-  setorAtual,
+  setorAtualCodigo,
+  setorAtualNome,
 }: TramitarModalProps) {
   const tramitarMutation = useTramitarProtocoloInterno();
   const { data: setores } = useSetores();
@@ -61,16 +69,16 @@ export function TramitarModal({
     formState: { errors },
   } = useForm<FormData>({
     defaultValues: {
-      paraSetor: '',
-      despacho: '',
+      to_sector_code: '',
+      dispatch_note: '',
     },
   });
 
-  const despacho = watch('despacho');
+  const dispatch_note = watch('dispatch_note');
 
   useEffect(() => {
     if (open) {
-      reset({ paraSetor: '', despacho: '' });
+      reset({ to_sector_code: '', dispatch_note: '' });
     }
   }, [open, reset]);
 
@@ -80,9 +88,11 @@ export function TramitarModal({
 
     tramitarMutation.mutate(
       {
-        protocoloInternoId,
-        paraSetor: parsed.data.paraSetor,
-        despacho: parsed.data.despacho,
+        id: protocoloInternoId,
+        data: {
+          to_sector_code: parsed.data.to_sector_code,
+          dispatch_note: parsed.data.dispatch_note,
+        },
       },
       {
         onSuccess: () => onOpenChange(false),
@@ -91,7 +101,8 @@ export function TramitarModal({
   }
 
   // Filtrar o setor atual da lista de destinos
-  const setoresDestino = setores?.filter((s) => s.nome !== setorAtual) ?? [];
+  const setoresDestino =
+    setores?.filter((s) => s.codigo !== setorAtualCodigo) ?? [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -104,7 +115,7 @@ export function TramitarModal({
             <div>
               <DialogTitle>Tramitar Protocolo</DialogTitle>
               <DialogDescription>
-                Enviar protocolo para outro setor com despacho obrigatório.
+                Enviar protocolo para outro setor com despacho obrigatorio.
               </DialogDescription>
             </div>
           </div>
@@ -113,7 +124,7 @@ export function TramitarModal({
         {/* Setor atual */}
         <div className="rounded-lg border border-border/40 bg-muted/20 px-3 py-2">
           <p className="text-xs text-muted-foreground">Setor atual</p>
-          <p className="text-sm font-medium">{setorAtual}</p>
+          <p className="text-sm font-medium">{setorAtualNome}</p>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -122,54 +133,59 @@ export function TramitarModal({
             <Label>
               Setor de destino <span className="text-destructive">*</span>
             </Label>
-            <Select onValueChange={(v) => setValue('paraSetor', v)}>
+            <Select
+              onValueChange={(v) => setValue('to_sector_code', v)}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Selecione o setor de destino" />
               </SelectTrigger>
               <SelectContent>
                 {setoresDestino.map((setor) => (
-                  <SelectItem key={setor.codigo} value={setor.nome}>
-                    {setor.nome}
+                  <SelectItem
+                    key={setor.codigo}
+                    value={String(setor.codigo)}
+                  >
+                    {setor.descricao}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {errors.paraSetor && (
+            {errors.to_sector_code && (
               <p className="text-sm text-destructive">
-                {errors.paraSetor.message}
+                {errors.to_sector_code.message}
               </p>
             )}
           </div>
 
           {/* Despacho */}
           <div className="space-y-2">
-            <Label htmlFor="despacho">
+            <Label htmlFor="dispatch_note">
               Despacho <span className="text-destructive">*</span>
             </Label>
             <Textarea
-              id="despacho"
-              placeholder="Descreva o motivo da tramitação..."
+              id="dispatch_note"
+              placeholder="Descreva o motivo da tramitacao..."
               rows={4}
-              {...register('despacho')}
+              {...register('dispatch_note')}
             />
             <div className="flex items-center justify-between">
-              {errors.despacho ? (
+              {errors.dispatch_note ? (
                 <p className="text-sm text-destructive">
-                  {errors.despacho.message}
+                  {errors.dispatch_note.message}
                 </p>
               ) : (
                 <span />
               )}
               <span
                 className={`text-xs ${
-                  despacho.length > 900
-                    ? despacho.length > 1000
+                  dispatch_note.length > 900
+                    ? dispatch_note.length > 1000
                       ? 'font-medium text-destructive'
                       : 'text-amber-600'
                     : 'text-muted-foreground'
                 }`}
               >
-                {despacho.length}/1000
+                {dispatch_note.length}/1000
               </span>
             </div>
           </div>

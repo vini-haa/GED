@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useAddAdmin } from '@/hooks/use-admin';
-import { mockSetores } from '@/lib/mock-protocols';
+import { useSetores } from '@/hooks/use-protocolos';
 
 const schema = z.object({
   nome: z
@@ -47,6 +47,7 @@ interface AddAdminModalProps {
 
 export function AddAdminModal({ open, onOpenChange }: AddAdminModalProps) {
   const addMutation = useAddAdmin();
+  const { data: setores = [] } = useSetores();
 
   const {
     register,
@@ -127,9 +128,9 @@ export function AddAdminModal({ open, onOpenChange }: AddAdminModalProps) {
                 <SelectValue placeholder="Selecione um setor" />
               </SelectTrigger>
               <SelectContent>
-                {mockSetores.map((s) => (
-                  <SelectItem key={s.codigo} value={s.nome}>
-                    {s.nome}
+                {setores.map((s) => (
+                  <SelectItem key={s.codigo} value={s.descricao}>
+                    {s.descricao}
                   </SelectItem>
                 ))}
               </SelectContent>

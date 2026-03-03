@@ -15,20 +15,39 @@ export interface PaginatedResponse<T> {
   data: T[];
   pagination: {
     page: number;
-    per_page: number;
+    page_size: number;
     total: number;
     total_pages: number;
   };
+}
+
+function isTokenExpired(): boolean {
+  if (typeof window === 'undefined') return false;
+  const expiresAt = localStorage.getItem('auth_expires_at');
+  if (!expiresAt) return true;
+  return new Date(expiresAt).getTime() <= Date.now();
+}
+
+function clearAuth() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('auth_expires_at');
+}
+
+function redirectToLogin() {
+  if (typeof window === 'undefined') return;
+  const currentPath = window.location.pathname;
+  if (currentPath !== '/login') {
+    clearAuth();
+    window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
+  }
 }
 
 class ApiClient {
   private baseUrl: string;
 
   constructor(baseUrl?: string) {
-    this.baseUrl =
-      baseUrl ||
-      process.env.NEXT_PUBLIC_API_URL ||
-      'http://localhost:4017/api/v1';
+    this.baseUrl = baseUrl || '/api';
   }
 
   private getToken(): string | null {
@@ -38,12 +57,29 @@ class ApiClient {
     return null;
   }
 
+  logout() {
+    clearAuth();
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
+  }
+
+  isAuthenticated(): boolean {
+    return !!this.getToken() && !isTokenExpired();
+  }
+
   private async request<T>(
     method: HttpMethod,
     path: string,
     body?: unknown,
     options?: RequestInit
   ): Promise<T> {
+    // Verificar expiração antes de requests autenticados
+    if (isTokenExpired() && !path.startsWith('/auth/')) {
+      redirectToLogin();
+      throw { code: 'TOKEN_EXPIRED', message: 'Sessão expirada' } as ApiError;
+    }
+
     const url = `${this.baseUrl}${path}`;
     const token = this.getToken();
 
@@ -61,6 +97,12 @@ class ApiClient {
     });
 
     if (!response.ok) {
+      // 401 = token inválido/expirado no servidor
+      if (response.status === 401 && !path.startsWith('/auth/')) {
+        redirectToLogin();
+        throw { code: 'UNAUTHORIZED', message: 'Sessão expirada' } as ApiError;
+      }
+
       const errorBody = await response.json().catch(() => null);
       const apiError: ApiError = errorBody?.error || {
         code: 'UNKNOWN_ERROR',
@@ -90,8 +132,8 @@ class ApiClient {
     return this.request<T>('PATCH', path, body, options);
   }
 
-  delete<T>(path: string, options?: RequestInit) {
-    return this.request<T>('DELETE', path, undefined, options);
+  delete<T>(path: string, body?: unknown, options?: RequestInit) {
+    return this.request<T>('DELETE', path, body, options);
   }
 
   async upload<T>(path: string, formData: FormData, options?: RequestInit) {

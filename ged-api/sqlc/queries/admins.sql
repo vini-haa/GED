@@ -2,6 +2,10 @@
 SELECT * FROM admins
 WHERE email = $1 AND ativo = true;
 
+-- name: GetAdminByEmailAny :one
+SELECT * FROM admins
+WHERE email = $1;
+
 -- name: ListAdmins :many
 SELECT * FROM admins
 ORDER BY criado_em DESC
@@ -18,6 +22,14 @@ WHERE id = $1;
 
 -- name: DeactivateAdmin :exec
 UPDATE admins SET ativo = false, atualizado_em = NOW()
+WHERE id = $1;
+
+-- name: GetAdminByID :one
+SELECT * FROM admins
+WHERE id = $1;
+
+-- name: ActivateAdmin :exec
+UPDATE admins SET ativo = true, atualizado_em = NOW()
 WHERE id = $1;
 
 -- name: CountAdmins :one

@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/tabs';
 import { Pagination } from '@/components/shared/Pagination';
 import { useProtocolos } from '@/hooks/use-protocolos';
-import type { ProtocolFilters, ProtocolStatus, ProtocolTab } from '@/lib/types';
+import type { ProtocolFilters, ProtocolTab } from '@/lib/types';
 import {
   Building2,
   Clock,
@@ -29,27 +29,27 @@ const tabs: Array<{
   label: string;
   icon: typeof FileText;
 }> = [
-  { value: 'my-sector', label: 'Meu Setor', icon: Building2 },
-  { value: 'recents', label: 'Recentes', icon: Clock },
-  { value: 'no-docs', label: 'Sem Docs', icon: FileText },
-  { value: 'internals', label: 'Internos', icon: FolderOpen },
-  { value: 'all', label: 'Todos', icon: List },
+  { value: 'meu_setor', label: 'Meu Setor', icon: Building2 },
+  { value: 'recentes', label: 'Recentes', icon: Clock },
+  { value: 'sem_docs', label: 'Sem Docs', icon: FileText },
+  { value: 'internos', label: 'Internos', icon: FolderOpen },
+  { value: 'todos', label: 'Todos', icon: List },
 ];
 
 const defaultFilters: ProtocolFilters = {
-  tab: 'my-sector',
+  tab: 'meu_setor',
   busca: '',
   status: 'all',
   setor: 'all',
   periodo: 'all',
   page: 1,
-  perPage: PER_PAGE,
+  pageSize: PER_PAGE,
 };
 
 export function ProtocoloTabs() {
   const [filters, setFilters] = useState<ProtocolFilters>(defaultFilters);
-  const [searchScope, setSearchScope] = useState<'my-sector' | 'all'>(
-    'my-sector'
+  const [searchScope, setSearchScope] = useState<'meu_setor' | 'todos'>(
+    'meu_setor'
   );
 
   const { data: result, isLoading } = useProtocolos(filters);
@@ -59,7 +59,7 @@ export function ProtocoloTabs() {
       setFilters((prev) => ({
         ...prev,
         ...partial,
-        // Reseta página ao mudar qualquer filtro (exceto page)
+        // Reseta pagina ao mudar qualquer filtro (exceto page)
         page: 'page' in partial ? (partial.page ?? 1) : 1,
       }));
     },
@@ -81,15 +81,15 @@ export function ProtocoloTabs() {
   );
 
   const handleScopeChange = useCallback(
-    (scope: 'my-sector' | 'all') => {
+    (scope: 'meu_setor' | 'todos') => {
       setSearchScope(scope);
-      updateFilters({ tab: scope === 'my-sector' ? 'my-sector' : 'all' });
+      updateFilters({ tab: scope === 'meu_setor' ? 'meu_setor' : 'todos' });
     },
     [updateFilters]
   );
 
   const handleStatusChange = useCallback(
-    (status: ProtocolStatus | 'all') => {
+    (status: string) => {
       updateFilters({ status });
     },
     [updateFilters]
@@ -109,6 +109,20 @@ export function ProtocoloTabs() {
     [updateFilters]
   );
 
+  const handleOrdenacaoChange = useCallback(
+    (ordenacao: 'data_criacao' | 'data_chegada_setor') => {
+      updateFilters({ ordenacao });
+    },
+    [updateFilters]
+  );
+
+  const handleProjetoChange = useCallback(
+    (projeto: string) => {
+      updateFilters({ projeto: projeto || undefined });
+    },
+    [updateFilters]
+  );
+
   const handleClearFilters = useCallback(() => {
     setFilters((prev) => ({
       ...prev,
@@ -116,6 +130,8 @@ export function ProtocoloTabs() {
       status: 'all',
       setor: 'all',
       periodo: 'all',
+      ordenacao: undefined,
+      projeto: undefined,
       page: 1,
     }));
   }, []);
@@ -131,7 +147,8 @@ export function ProtocoloTabs() {
     filters.busca !== '' ||
     filters.status !== 'all' ||
     filters.setor !== 'all' ||
-    filters.periodo !== 'all';
+    filters.periodo !== 'all' ||
+    !!filters.projeto;
 
   return (
     <div className="space-y-4">
@@ -149,7 +166,7 @@ export function ProtocoloTabs() {
           ))}
         </TabsList>
 
-        {filters.tab !== 'internals' && (
+        {filters.tab !== 'internos' && (
           <div className="mt-4 space-y-3">
             <ProtocoloSearchBar
               value={filters.busca}
@@ -162,20 +179,24 @@ export function ProtocoloTabs() {
               status={filters.status}
               setor={filters.setor}
               periodo={filters.periodo}
+              ordenacao={filters.ordenacao}
               onStatusChange={handleStatusChange}
               onSetorChange={handleSetorChange}
               onPeriodoChange={handlePeriodoChange}
+              onOrdenacaoChange={handleOrdenacaoChange}
+              projeto={filters.projeto}
+              onProjetoChange={handleProjetoChange}
               onClear={handleClearFilters}
             />
           </div>
         )}
 
-        <TabsContent value="internals" className="mt-4">
+        <TabsContent value="internos" className="mt-4">
           <ProtocoloInternoTable />
         </TabsContent>
 
         {tabs
-          .filter((t) => t.value !== 'internals')
+          .filter((t) => t.value !== 'internos')
           .map((tab) => (
             <TabsContent key={tab.value} value={tab.value} className="mt-4">
               <ProtocoloTable
@@ -188,12 +209,12 @@ export function ProtocoloTabs() {
           ))}
       </Tabs>
 
-      {result && result.meta.total_pages > 1 && (
+      {result && result.pagination.total_pages > 1 && (
         <Pagination
-          page={result.meta.page}
-          totalPages={result.meta.total_pages}
-          total={result.meta.total}
-          perPage={result.meta.per_page}
+          page={result.pagination.page}
+          totalPages={result.pagination.total_pages}
+          total={result.pagination.total}
+          perPage={result.pagination.page_size}
           onPageChange={handlePageChange}
         />
       )}

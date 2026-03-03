@@ -10,8 +10,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useProtocoloCounters } from '@/hooks/use-protocolos';
 import { FileText, FileX, Files } from 'lucide-react';
 
-export function ProtocoloCounters() {
-  const { data: counters, isLoading } = useProtocoloCounters();
+interface ProtocoloCountersProps {
+  setor: number | null;
+}
+
+export function ProtocoloCounters({ setor }: ProtocoloCountersProps) {
+  const { data: counters, isLoading } = useProtocoloCounters(setor);
 
   if (isLoading) {
     return (
@@ -35,19 +39,19 @@ export function ProtocoloCounters() {
   const cards = [
     {
       title: 'Protocolos no Setor',
-      value: counters?.totalSetor ?? 0,
+      value: counters?.total_protocolos ?? 0,
       description: 'vinculados ao seu setor',
       icon: FileText,
     },
     {
       title: 'Sem Documentos',
-      value: counters?.semDocumentos ?? 0,
+      value: counters?.sem_documentos ?? 0,
       description: 'aguardando anexos',
       icon: FileX,
     },
     {
       title: 'Total de Documentos',
-      value: counters?.totalDocumentos ?? 0,
+      value: counters?.docs_anexados ?? 0,
       description: 'em todos os protocolos',
       icon: Files,
     },

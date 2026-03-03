@@ -1,71 +1,121 @@
 // ============================================
-// Status e tipos de protocolo
+// Paginação genérica (espelho do Go Pagination)
 // ============================================
 
-export type ProtocolStatus =
-  | 'Em Andamento'
-  | 'Concluído'
-  | 'Pendente'
-  | 'Cancelado';
+export interface Pagination {
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+}
+
+export interface PaginatedResult<T> {
+  data: T[];
+  pagination: Pagination;
+}
+
+// ============================================
+// Protocolo SAGI — espelho de dto.ProtocoloItem
+// ============================================
 
 export type ProtocolTab =
-  | 'my-sector'
-  | 'recents'
-  | 'no-docs'
-  | 'internals'
-  | 'all';
+  | 'todos'
+  | 'meu_setor'
+  | 'recentes'
+  | 'sem_docs'
+  | 'internos';
 
-/** Protocolo SAGI (leitura do SQL Server) — campos em camelCase no frontend */
 export interface Protocol {
-  id: string;
-  numeroProtocolo: number;
-  anoProtocolo: number;
-  dataProtocolo: string;
-  codigoOrigem: number;
-  setorOrigem: string | null;
-  codigoDestino: number;
-  setorDestino: string | null;
-  assunto: string | null;
-  situacao: ProtocolStatus;
-  projetoDescricao: string | null;
-  numeroConvenio: string | null;
-  documentCount: number;
-  lastUpdated: string;
+  id: number;
+  numero_protocolo: string;
+  data_criacao: string | null;
+  assunto: string;
+  nome_projeto: string;
+  codigo_convenio: string;
+  nome_interessado: string;
+  nome_setor_atual: string;
+  cod_setor_atual: number;
+  data_chegada_setor: string | null;
+  status: string;
+  doc_count: number;
+  is_new: boolean;
+  has_recent_observations: boolean;
+  is_internal: boolean;
 }
 
-/** Contadores para os cards KPI */
+/** Contadores — espelho de dto.ContadoresResponse */
 export interface ProtocolCounters {
-  totalSetor: number;
-  semDocumentos: number;
-  totalDocumentos: number;
+  total_protocolos: number;
+  sem_documentos: number;
+  docs_anexados: number;
 }
 
-/** Filtros aplicados na listagem de protocolos */
+/** Filtros para listagem de protocolos */
 export interface ProtocolFilters {
   tab: ProtocolTab;
   busca: string;
-  status: ProtocolStatus | 'all';
+  status: string;
   setor: number | 'all';
   periodo: 'all' | '7d' | '30d' | '90d' | '1y';
   page: number;
-  perPage: number;
+  pageSize: number;
+  ordenacao?: 'data_criacao' | 'data_chegada_setor';
+  projeto?: string;
 }
 
-/** Setor do SAGI */
+/** Setor — espelho de dto.SetorItem */
 export interface Setor {
   codigo: number;
-  nome: string;
+  descricao: string;
 }
 
-/** Resposta paginada (espelho do contrato da API) */
-export interface PaginatedResult<T> {
-  data: T[];
-  meta: {
-    page: number;
-    per_page: number;
-    total: number;
-    total_pages: number;
-  };
+/** Remove o prefixo "- " de nomes de setor SAGI (dados legados). */
+export function formatSectorName(name: string | undefined | null): string {
+  if (!name) return '—';
+  return name.startsWith('- ') ? name.slice(2) : name;
+}
+
+// ============================================
+// Busca Global — espelho de dto.SearchResponse
+// ============================================
+
+export interface SearchResultItem {
+  id: number;
+  numero_protocolo: string;
+  assunto: string;
+  nome_projeto: string;
+  nome_interessado: string;
+  tipo: string;
+  highlight: string;
+}
+
+export interface SearchResponse {
+  results: SearchResultItem[];
+  total_setor: number;
+  total_todos: number;
+}
+
+// ============================================
+// Detalhe do Protocolo — espelho de dto.ProtocoloDetalheResponse
+// ============================================
+
+export interface ProtocoloDetalhe {
+  id: number;
+  numero_protocolo: string;
+  data_criacao: string | null;
+  assunto: string;
+  nome_projeto: string;
+  codigo_convenio: string;
+  nome_interessado: string;
+  nome_setor_atual: string;
+  cod_setor_atual: number;
+  data_chegada_setor: string | null;
+  status: string;
+  is_internal: boolean;
+  doc_count: number;
+  observation_count: number;
+  has_recent_observations: boolean;
+  tramitacao_count: number;
 }
 
 // ============================================
@@ -82,124 +132,208 @@ export interface DocumentType {
 }
 
 // ============================================
-// Documentos (Semana 4)
+// Documentos — espelho de dto.DocumentoItem
 // ============================================
 
-/** Documento vinculado a um protocolo SAGI */
 export interface Documento {
   id: string;
-  protocoloSagi: string;
-  tipoDocumentoId: string | null;
-  tipoDocumentoNome: string | null;
-  nomeArquivo: string;
-  driveFileId: string | null;
-  driveFileUrl: string | null;
-  tamanhoBytes: number | null;
-  mimeType: string | null;
-  uploadedBy: string;
-  uploadedAt: string;
+  protocolo_sagi: string;
+  tipo_documento_id: string | null;
+  tipo_documento_nome: string;
+  nome_arquivo: string;
+  descricao: string;
+  drive_file_url: string;
+  tamanho_bytes: number;
+  mime_type: string;
+  uploaded_by: string;
+  uploaded_by_name: string;
+  uploaded_at: string | null;
+  can_edit: boolean;
+  can_delete: boolean;
+}
+
+export interface ListDocumentosResponse {
+  data: Documento[];
+  total: number;
 }
 
 // ============================================
-// Observações (Semana 5)
+// Observações — espelho de dto.ObservacaoItem
 // ============================================
 
-/** Observação/comentário em um protocolo SAGI */
 export interface Observacao {
   id: string;
-  protocoloSagi: string;
-  texto: string;
-  autorEmail: string;
-  autorNome: string;
-  autorSetor: string;
-  importante: boolean;
-  criadoEm: string;
-  editadoEm: string | null;
+  protocol_id: number;
+  protocol_source: string;
+  content: string;
+  is_important: boolean;
+  created_by_email: string;
+  created_by_name: string;
+  created_by_sector: string;
+  created_at: string | null;
+  updated_at: string | null;
+  can_edit: boolean;
+  can_delete: boolean;
+}
+
+export interface ListObservacoesResponse {
+  data: Observacao[];
+  total: number;
+  has_recent: boolean;
 }
 
 // ============================================
-// Tramitação SAGI (Semana 5)
+// Tramitação SAGI — espelho de dto.TramitacaoItem
 // ============================================
 
-/** Movimentação de protocolo entre setores */
 export interface TramitacaoSagi {
-  id: string;
-  protocoloSagi: string;
-  deSetor: string;
-  paraSetor: string;
-  despacho: string | null;
-  tramitadoPorNome: string;
-  tramitadoEm: string;
+  sequencia: number;
+  data_movimentacao: string | null;
+  setor_origem: string;
+  setor_destino: string;
+  situacao: string;
+  reg_atual: boolean;
+  permanencia_dias: number;
+}
+
+export interface TramitacaoResumo {
+  tempo_total_dias: number;
+  total_setores: number;
+  setor_mais_longo: string;
+  dias_setor_mais_longo: number;
+}
+
+export interface TramitacaoResponse {
+  data: TramitacaoSagi[];
+  total: number;
+  resumo: TramitacaoResumo;
 }
 
 // ============================================
-// Protocolo Interno GED (Semana 6)
+// Protocolo Interno — espelho de dto.InternalProtocolItem / Detail
 // ============================================
 
 export type StatusProtocoloInterno =
-  | 'ABERTO'
-  | 'EM_ANDAMENTO'
-  | 'FINALIZADO'
-  | 'CANCELADO';
+  | 'aberto'
+  | 'em_analise'
+  | 'finalizado'
+  | 'arquivado'
+  | 'cancelado';
 
-/** Protocolo interno criado pelo GED (não SAGI) */
 export interface ProtocoloInterno {
-  id: string;
-  numero: string;
-  assunto: string;
-  descricao: string | null;
+  id: number;
+  protocol_number: string;
+  subject: string;
+  interested: string;
+  sender: string;
+  project_name: string;
+  current_sector_name: string;
+  current_sector_code: number;
   status: StatusProtocoloInterno;
-  setorOrigem: string;
-  criadoPorEmail: string;
-  criadoPorNome: string;
-  criadoEm: string;
-  atualizadoEm: string;
+  created_by_name: string;
+  created_by_email: string;
+  created_at: string | null;
+  doc_count: number;
+  obs_count: number;
 }
 
-/** Tramitação de protocolo interno */
-export interface TramitacaoInterna {
-  id: string;
-  protocoloInternoId: string;
-  deSetor: string;
-  paraSetor: string;
-  despacho: string | null;
-  tramitadoPorEmail: string;
-  tramitadoPorNome: string;
-  tramitadoEm: string;
+export interface ProtocoloInternoDetalhe {
+  id: number;
+  protocol_number: string;
+  subject: string;
+  interested: string;
+  sender: string;
+  project_name: string;
+  current_sector_name: string;
+  current_sector_code: number;
+  status: StatusProtocoloInterno;
+  cancel_reason?: string;
+  created_by_name: string;
+  created_by_email: string;
+  created_at: string | null;
+  updated_at: string | null;
+  doc_count: number;
+  obs_count: number;
+  tramitacao_count: number;
 }
 
-/** Detalhes completos de protocolo interno */
-export interface ProtocoloInternoDetalhes {
-  protocolo: ProtocoloInterno;
-  tramitacoes: TramitacaoInterna[];
-}
-
-/** Request para criar protocolo interno */
+/** Request para criar protocolo interno — espelho de dto.CreateInternalProtocolRequest */
 export interface CreateProtocoloInternoRequest {
-  assunto: string;
-  descricao?: string;
-  setorOrigem: string;
+  subject: string;
+  interested: string;
+  sender: string;
+  project_name: string;
+  sector_code?: number;
 }
 
-/** Request para editar protocolo interno */
+/** Request para editar protocolo interno — espelho de dto.UpdateInternalProtocolRequest */
 export interface UpdateProtocoloInternoRequest {
-  id: string;
-  assunto: string;
-  descricao?: string;
+  subject?: string;
+  interested?: string;
+  sender?: string;
+  project_name?: string;
+}
+
+/** Request para alterar status */
+export interface ChangeStatusRequest {
+  status: string;
+  cancel_reason?: string;
+}
+
+/** Request para tramitar */
+export interface DispatchRequest {
+  to_sector_code: number;
+  dispatch_note: string;
 }
 
 // ============================================
-// Dashboard (Semana 8)
+// Tramitação Interna — espelho de dto.MovementItem
 // ============================================
 
-/** Filtros globais do dashboard */
+export interface TramitacaoInterna {
+  id: number;
+  sequence: number;
+  from_sector_name: string;
+  to_sector_name: string;
+  dispatch_note: string;
+  moved_by_name: string;
+  moved_by_email: string;
+  moved_at: string | null;
+  is_current: boolean;
+  permanencia_dias: number;
+}
+
+export interface MovementResumo {
+  tempo_total_dias: number;
+  total_setores: number;
+  setor_mais_longo: string;
+  dias_setor_mais_longo: number;
+}
+
+export interface MovementHistoryResponse {
+  data: TramitacaoInterna[];
+  total: number;
+  resumo: MovementResumo;
+}
+
+export interface ListInternalProtocolsResponse {
+  data: ProtocoloInterno[];
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+}
+
+// ============================================
+// Dashboard (Semana 7-8) — endpoints: GET /api/dashboard/*
+// ============================================
+
 export interface DashboardFilters {
   periodo: '7d' | '30d' | '90d' | '1y';
   setor: string | 'all';
   projeto: string | 'all';
 }
 
-/** KPI com valor e variação percentual */
 export interface DashboardKpi {
   label: string;
   valor: number;
@@ -207,28 +341,24 @@ export interface DashboardKpi {
   formato: 'numero' | 'dias';
 }
 
-/** Ponto de dados para gráfico de uploads por período */
 export interface UploadsPeriodoItem {
   data: string;
   uploads: number;
   protocolos: number;
 }
 
-/** Fatia para gráfico de documentos por tipo */
 export interface DocsPorTipoItem {
   tipo: string;
   quantidade: number;
   cor: string;
 }
 
-/** Barra para gráfico de tramitação por setor */
 export interface TramitacaoSetorItem {
   setor: string;
   tempoMedioDias: number;
   acimaDaMedia: boolean;
 }
 
-/** Item do ranking de uploads */
 export interface RankingUploadItem {
   posicao: number;
   nome: string;
@@ -236,7 +366,6 @@ export interface RankingUploadItem {
   uploads: number;
 }
 
-/** Protocolo sem documentos para listagem */
 export interface ProtocoloSemDocs {
   id: string;
   numero: string;
@@ -245,7 +374,6 @@ export interface ProtocoloSemDocs {
   diasSemDocumento: number;
 }
 
-/** Dados completos do dashboard */
 export interface DashboardData {
   kpis: DashboardKpi[];
   uploadsPeriodo: UploadsPeriodoItem[];
@@ -256,10 +384,9 @@ export interface DashboardData {
 }
 
 // ============================================
-// Administradores (Semana 9)
+// Administradores (Semana 9) — endpoints: /api/admin/admins
 // ============================================
 
-/** Administrador do GED */
 export interface AdminUser {
   id: string;
   nome: string;
@@ -272,7 +399,7 @@ export interface AdminUser {
 }
 
 // ============================================
-// Logs de Atividade (Semana 9)
+// Logs de Atividade (Semana 9) — endpoint: GET /api/admin/logs
 // ============================================
 
 export type LogAction =
@@ -285,7 +412,6 @@ export type LogAction =
   | 'EXPORT'
   | 'ADMIN_CHANGE';
 
-/** Entrada de log de atividade */
 export interface ActivityLog {
   id: string;
   acao: LogAction;
@@ -306,7 +432,6 @@ export interface ActivityLog {
 
 export type UploadFileStatus = 'queued' | 'uploading' | 'done' | 'error';
 
-/** Arquivo na fila de upload */
 export interface UploadFileItem {
   id: string;
   file: File;
@@ -314,4 +439,15 @@ export interface UploadFileItem {
   status: UploadFileStatus;
   progress: number;
   error: string | null;
+}
+
+// ============================================
+// Usuário atual — espelho de GET /api/me
+// ============================================
+
+export interface CurrentUser {
+  email: string;
+  nome: string;
+  role: string;
+  setor?: string;
 }

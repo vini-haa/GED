@@ -6,21 +6,26 @@ package db
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type ActivityLog struct {
-	ID           uuid.UUID        `json:"id"`
-	Acao         string           `json:"acao"`
-	Entidade     string           `json:"entidade"`
-	EntidadeID   pgtype.Text      `json:"entidade_id"`
-	Detalhes     json.RawMessage  `json:"detalhes"`
-	UsuarioEmail string           `json:"usuario_email"`
-	UsuarioNome  string           `json:"usuario_nome"`
-	IpAddress    pgtype.Text      `json:"ip_address"`
-	CriadoEm     pgtype.Timestamp `json:"criado_em"`
+	ID             uuid.UUID        `json:"id"`
+	Acao           string           `json:"acao"`
+	Entidade       string           `json:"entidade"`
+	EntidadeID     pgtype.Text      `json:"entidade_id"`
+	Detalhes       json.RawMessage  `json:"detalhes"`
+	UsuarioEmail   string           `json:"usuario_email"`
+	UsuarioNome    string           `json:"usuario_nome"`
+	IpAddress      pgtype.Text      `json:"ip_address"`
+	CriadoEm       pgtype.Timestamp `json:"criado_em"`
+	UserAgent      pgtype.Text      `json:"user_agent"`
+	ProtocolID     pgtype.Int4      `json:"protocol_id"`
+	ProtocolNumber pgtype.Text      `json:"protocol_number"`
+	ProtocolSource pgtype.Text      `json:"protocol_source"`
 }
 
 type Admin struct {
@@ -42,20 +47,63 @@ type CacheEmailSetor struct {
 }
 
 type Documento struct {
-	ID              uuid.UUID        `json:"id"`
-	ProtocoloSagi   string           `json:"protocolo_sagi"`
-	TipoDocumentoID pgtype.UUID      `json:"tipo_documento_id"`
-	NomeArquivo     string           `json:"nome_arquivo"`
-	DriveFileID     pgtype.Text      `json:"drive_file_id"`
-	DriveFileUrl    pgtype.Text      `json:"drive_file_url"`
-	TamanhoBytes    pgtype.Int8      `json:"tamanho_bytes"`
-	MimeType        pgtype.Text      `json:"mime_type"`
-	HashSha256      pgtype.Text      `json:"hash_sha256"`
-	UploadedBy      string           `json:"uploaded_by"`
-	UploadedAt      pgtype.Timestamp `json:"uploaded_at"`
-	DeletedAt       pgtype.Timestamp `json:"deleted_at"`
-	DeletedBy       pgtype.Text      `json:"deleted_by"`
-	MotivoExclusao  pgtype.Text      `json:"motivo_exclusao"`
+	ID                  uuid.UUID        `json:"id"`
+	ProtocoloSagi       string           `json:"protocolo_sagi"`
+	TipoDocumentoID     pgtype.UUID      `json:"tipo_documento_id"`
+	NomeArquivo         string           `json:"nome_arquivo"`
+	DriveFileID         pgtype.Text      `json:"drive_file_id"`
+	DriveFileUrl        pgtype.Text      `json:"drive_file_url"`
+	TamanhoBytes        pgtype.Int8      `json:"tamanho_bytes"`
+	MimeType            pgtype.Text      `json:"mime_type"`
+	HashSha256          pgtype.Text      `json:"hash_sha256"`
+	UploadedBy          string           `json:"uploaded_by"`
+	UploadedAt          pgtype.Timestamp `json:"uploaded_at"`
+	DeletedAt           pgtype.Timestamp `json:"deleted_at"`
+	DeletedBy           pgtype.Text      `json:"deleted_by"`
+	MotivoExclusao      pgtype.Text      `json:"motivo_exclusao"`
+	Descricao           pgtype.Text      `json:"descricao"`
+	UploadedByName      pgtype.Text      `json:"uploaded_by_name"`
+	GoogleDriveFolderID pgtype.Text      `json:"google_drive_folder_id"`
+}
+
+type InternalProtocol struct {
+	ID                int32              `json:"id"`
+	ProtocolNumber    string             `json:"protocol_number"`
+	Year              int32              `json:"year"`
+	Sequence          int32              `json:"sequence"`
+	Subject           string             `json:"subject"`
+	Interested        string             `json:"interested"`
+	Sender            string             `json:"sender"`
+	ProjectName       string             `json:"project_name"`
+	CurrentSectorCode int32              `json:"current_sector_code"`
+	CurrentSectorName string             `json:"current_sector_name"`
+	Status            string             `json:"status"`
+	CancelReason      pgtype.Text        `json:"cancel_reason"`
+	CreatedByID       string             `json:"created_by_id"`
+	CreatedByEmail    string             `json:"created_by_email"`
+	CreatedByName     pgtype.Text        `json:"created_by_name"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	IsDeleted         pgtype.Bool        `json:"is_deleted"`
+	DeletedAt         pgtype.Timestamptz `json:"deleted_at"`
+	DeletedByEmail    pgtype.Text        `json:"deleted_by_email"`
+	DeleteReason      pgtype.Text        `json:"delete_reason"`
+}
+
+type InternalProtocolMovement struct {
+	ID             int32              `json:"id"`
+	ProtocolID     int32              `json:"protocol_id"`
+	Sequence       int32              `json:"sequence"`
+	FromSectorCode pgtype.Int4        `json:"from_sector_code"`
+	FromSectorName pgtype.Text        `json:"from_sector_name"`
+	ToSectorCode   int32              `json:"to_sector_code"`
+	ToSectorName   string             `json:"to_sector_name"`
+	DispatchNote   string             `json:"dispatch_note"`
+	MovedByID      string             `json:"moved_by_id"`
+	MovedByEmail   string             `json:"moved_by_email"`
+	MovedByName    pgtype.Text        `json:"moved_by_name"`
+	MovedAt        pgtype.Timestamptz `json:"moved_at"`
+	IsCurrent      pgtype.Bool        `json:"is_current"`
 }
 
 type Observaco struct {
@@ -69,6 +117,10 @@ type Observaco struct {
 	DeletedAt      pgtype.Timestamp `json:"deleted_at"`
 	DeletedBy      pgtype.Text      `json:"deleted_by"`
 	MotivoExclusao pgtype.Text      `json:"motivo_exclusao"`
+	ProtocolID     pgtype.Int4      `json:"protocol_id"`
+	ProtocolSource pgtype.Text      `json:"protocol_source"`
+	IsImportant    pgtype.Bool      `json:"is_important"`
+	AutorSetor     pgtype.Text      `json:"autor_setor"`
 }
 
 type ProtocolosInterno struct {
@@ -101,4 +153,13 @@ type Tramitaco struct {
 	TramitadoPorEmail  string           `json:"tramitado_por_email"`
 	TramitadoPorNome   string           `json:"tramitado_por_nome"`
 	TramitadoEm        pgtype.Timestamp `json:"tramitado_em"`
+}
+
+type UserRecentProtocol struct {
+	ID           int32     `json:"id"`
+	UserEmail    string    `json:"user_email"`
+	ProtocolID   string    `json:"protocol_id"`
+	ProtocolType string    `json:"protocol_type"`
+	LastViewedAt time.Time `json:"last_viewed_at"`
+	ViewCount    int32     `json:"view_count"`
 }

@@ -1,112 +1,52 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, FileText, FolderOpen, X } from 'lucide-react';
+import { Search, FileText, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { mockProtocols } from '@/lib/mock-protocols';
-import { mockProtocolosInternos } from '@/lib/mock-protocolos-internos';
+import { apiClient } from '@/lib/api-client';
 import Link from 'next/link';
-import type { Protocol, ProtocolStatus, ProtocoloInterno, StatusProtocoloInterno } from '@/lib/types';
+import type { SearchResponse, SearchResultItem } from '@/lib/types';
 
 function getStatusVariant(
-  status: ProtocolStatus
+  status: string
 ): 'success' | 'warning' | 'default' | 'destructive' {
-  switch (status) {
-    case 'Concluído':
-      return 'success';
-    case 'Pendente':
-      return 'warning';
-    case 'Cancelado':
-      return 'destructive';
-    default:
-      return 'default';
-  }
+  const s = status.toLowerCase();
+  if (s.includes('conclu') || s.includes('finaliz')) return 'success';
+  if (s.includes('penden') || s.includes('aberto')) return 'warning';
+  if (s.includes('cancel')) return 'destructive';
+  return 'default';
 }
-
-function getInternoStatusLabel(status: StatusProtocoloInterno): string {
-  const map: Record<StatusProtocoloInterno, string> = {
-    ABERTO: 'Aberto',
-    EM_ANDAMENTO: 'Em Andamento',
-    FINALIZADO: 'Finalizado',
-    CANCELADO: 'Cancelado',
-  };
-  return map[status];
-}
-
-function getInternoStatusVariant(
-  status: StatusProtocoloInterno
-): 'success' | 'warning' | 'default' | 'destructive' {
-  switch (status) {
-    case 'FINALIZADO':
-      return 'success';
-    case 'ABERTO':
-      return 'warning';
-    case 'CANCELADO':
-      return 'destructive';
-    default:
-      return 'default';
-  }
-}
-
-function formatNumber(numero: number, ano: number): string {
-  return `${String(numero).padStart(5, '0')}/${ano}`;
-}
-
-type SearchResult =
-  | { type: 'sagi'; data: Protocol }
-  | { type: 'interno'; data: ProtocoloInterno };
 
 export function GlobalSearchBar() {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const [results, setResults] = useState<SearchResultItem[]>([]);
   const [totalResults, setTotalResults] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (query.length < 2) {
+    if (query.length < 3) {
       setResults([]);
       setTotalResults(0);
       setIsOpen(false);
       return;
     }
 
-    const timer = setTimeout(() => {
-      const q = query.toLowerCase();
-
-      // Buscar em protocolos SAGI
-      const sagiResults: SearchResult[] = mockProtocols
-        .filter(
-          (p) =>
-            `${p.numeroProtocolo}/${p.anoProtocolo}`.includes(q) ||
-            (p.assunto && p.assunto.toLowerCase().includes(q)) ||
-            (p.projetoDescricao &&
-              p.projetoDescricao.toLowerCase().includes(q)) ||
-            (p.setorOrigem && p.setorOrigem.toLowerCase().includes(q)) ||
-            (p.setorDestino && p.setorDestino.toLowerCase().includes(q))
-        )
-        .map((p) => ({ type: 'sagi' as const, data: p }));
-
-      // Buscar em protocolos internos
-      const internoResults: SearchResult[] = mockProtocolosInternos
-        .filter(
-          (p) =>
-            p.numero.toLowerCase().includes(q) ||
-            p.assunto.toLowerCase().includes(q) ||
-            (p.descricao && p.descricao.toLowerCase().includes(q)) ||
-            p.setorOrigem.toLowerCase().includes(q) ||
-            p.criadoPorNome.toLowerCase().includes(q)
-        )
-        .map((p) => ({ type: 'interno' as const, data: p }));
-
-      // Combinar resultados (internos primeiro por serem do GED, depois SAGI)
-      const combined = [...internoResults, ...sagiResults];
-
-      setTotalResults(combined.length);
-      setResults(combined.slice(0, 6));
-      setIsOpen(combined.length > 0);
+    const timer = setTimeout(async () => {
+      try {
+        const resp = await apiClient.get<SearchResponse>(
+          `/search?q=${encodeURIComponent(query)}&limit=6`
+        );
+        setResults(resp.results ?? []);
+        setTotalResults(resp.total_todos);
+        setIsOpen((resp.results?.length ?? 0) > 0);
+      } catch {
+        setResults([]);
+        setTotalResults(0);
+        setIsOpen(false);
+      }
     }, 300);
 
     return () => clearTimeout(timer);
@@ -174,42 +114,12 @@ export function GlobalSearchBar() {
             </p>
           </div>
           <div className="max-h-[300px] overflow-y-auto">
-            {results.map((result) => {
-              if (result.type === 'interno') {
-                const p = result.data;
-                return (
-                  <Link
-                    key={p.id}
-                    href={`/protocolo-interno/${p.id}`}
-                    className="flex items-start gap-3 px-3 py-2.5 hover:bg-accent transition-colors"
-                    onClick={handleResultClick}
-                  >
-                    <FolderOpen className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium truncate">
-                          {p.numero}
-                        </p>
-                        <Badge
-                          variant={getInternoStatusVariant(p.status)}
-                          className="text-[10px] px-1.5 py-0"
-                        >
-                          {getInternoStatusLabel(p.status)}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {p.assunto} — {p.setorOrigem}
-                      </p>
-                    </div>
-                  </Link>
-                );
-              }
-
-              const protocol = result.data;
+            {results.map((item) => {
+              const source = item.tipo === 'interno' ? 'interno' : 'sagi';
               return (
                 <Link
-                  key={protocol.id}
-                  href={`/protocolo/${protocol.numeroProtocolo}/${protocol.anoProtocolo}`}
+                  key={`${item.tipo}-${item.id}`}
+                  href={`/protocolo/${source}/${item.id}`}
                   className="flex items-start gap-3 px-3 py-2.5 hover:bg-accent transition-colors"
                   onClick={handleResultClick}
                 >
@@ -217,22 +127,22 @@ export function GlobalSearchBar() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium truncate">
-                        {formatNumber(
-                          protocol.numeroProtocolo,
-                          protocol.anoProtocolo
-                        )}
+                        {item.numero_protocolo}
                       </p>
-                      <Badge
-                        variant={getStatusVariant(protocol.situacao)}
-                        className="text-[10px] px-1.5 py-0"
-                      >
-                        {protocol.situacao}
-                      </Badge>
+                      {item.tipo === 'interno' && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                          Interno
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground truncate">
-                      {protocol.assunto ?? 'Sem assunto'} —{' '}
-                      {protocol.setorDestino ?? '—'}
+                      {item.assunto || 'Sem assunto'} — {item.nome_interessado || '—'}
                     </p>
+                    {item.highlight && (
+                      <p className="text-xs text-muted-foreground/70 truncate mt-0.5 italic">
+                        {item.highlight}
+                      </p>
+                    )}
                   </div>
                 </Link>
               );

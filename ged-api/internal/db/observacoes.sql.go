@@ -12,25 +12,54 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countRecentObservacoes = `-- name: CountRecentObservacoes :one
+SELECT COUNT(*) FROM observacoes
+WHERE protocol_id = $1 AND protocol_source = $2
+  AND deleted_at IS NULL AND criado_em > NOW() - INTERVAL '48 hours'
+`
+
+type CountRecentObservacoesParams struct {
+	ProtocolID     pgtype.Int4 `json:"protocol_id"`
+	ProtocolSource pgtype.Text `json:"protocol_source"`
+}
+
+func (q *Queries) CountRecentObservacoes(ctx context.Context, arg CountRecentObservacoesParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countRecentObservacoes, arg.ProtocolID, arg.ProtocolSource)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createObservacao = `-- name: CreateObservacao :one
-INSERT INTO observacoes (protocolo_sagi, texto, autor_email, autor_nome)
-VALUES ($1, $2, $3, $4)
-RETURNING id, protocolo_sagi, texto, autor_email, autor_nome, criado_em, editado_em, deleted_at, deleted_by, motivo_exclusao
+INSERT INTO observacoes (
+    protocolo_sagi, protocol_id, protocol_source,
+    texto, is_important,
+    autor_email, autor_nome, autor_setor
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, protocolo_sagi, texto, autor_email, autor_nome, criado_em, editado_em, deleted_at, deleted_by, motivo_exclusao, protocol_id, protocol_source, is_important, autor_setor
 `
 
 type CreateObservacaoParams struct {
-	ProtocoloSagi string `json:"protocolo_sagi"`
-	Texto         string `json:"texto"`
-	AutorEmail    string `json:"autor_email"`
-	AutorNome     string `json:"autor_nome"`
+	ProtocoloSagi  string      `json:"protocolo_sagi"`
+	ProtocolID     pgtype.Int4 `json:"protocol_id"`
+	ProtocolSource pgtype.Text `json:"protocol_source"`
+	Texto          string      `json:"texto"`
+	IsImportant    pgtype.Bool `json:"is_important"`
+	AutorEmail     string      `json:"autor_email"`
+	AutorNome      string      `json:"autor_nome"`
+	AutorSetor     pgtype.Text `json:"autor_setor"`
 }
 
 func (q *Queries) CreateObservacao(ctx context.Context, arg CreateObservacaoParams) (Observaco, error) {
 	row := q.db.QueryRow(ctx, createObservacao,
 		arg.ProtocoloSagi,
+		arg.ProtocolID,
+		arg.ProtocolSource,
 		arg.Texto,
+		arg.IsImportant,
 		arg.AutorEmail,
 		arg.AutorNome,
+		arg.AutorSetor,
 	)
 	var i Observaco
 	err := row.Scan(
@@ -44,18 +73,53 @@ func (q *Queries) CreateObservacao(ctx context.Context, arg CreateObservacaoPara
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.MotivoExclusao,
+		&i.ProtocolID,
+		&i.ProtocolSource,
+		&i.IsImportant,
+		&i.AutorSetor,
 	)
 	return i, err
 }
 
-const listObservacoesByProtocolo = `-- name: ListObservacoesByProtocolo :many
-SELECT id, protocolo_sagi, texto, autor_email, autor_nome, criado_em, editado_em, deleted_at, deleted_by, motivo_exclusao FROM observacoes
-WHERE protocolo_sagi = $1 AND deleted_at IS NULL
-ORDER BY criado_em DESC
+const getObservacaoByID = `-- name: GetObservacaoByID :one
+SELECT id, protocolo_sagi, texto, autor_email, autor_nome, criado_em, editado_em, deleted_at, deleted_by, motivo_exclusao, protocol_id, protocol_source, is_important, autor_setor FROM observacoes WHERE id = $1
 `
 
-func (q *Queries) ListObservacoesByProtocolo(ctx context.Context, protocoloSagi string) ([]Observaco, error) {
-	rows, err := q.db.Query(ctx, listObservacoesByProtocolo, protocoloSagi)
+func (q *Queries) GetObservacaoByID(ctx context.Context, id uuid.UUID) (Observaco, error) {
+	row := q.db.QueryRow(ctx, getObservacaoByID, id)
+	var i Observaco
+	err := row.Scan(
+		&i.ID,
+		&i.ProtocoloSagi,
+		&i.Texto,
+		&i.AutorEmail,
+		&i.AutorNome,
+		&i.CriadoEm,
+		&i.EditadoEm,
+		&i.DeletedAt,
+		&i.DeletedBy,
+		&i.MotivoExclusao,
+		&i.ProtocolID,
+		&i.ProtocolSource,
+		&i.IsImportant,
+		&i.AutorSetor,
+	)
+	return i, err
+}
+
+const listObservacoesByProtocol = `-- name: ListObservacoesByProtocol :many
+SELECT id, protocolo_sagi, texto, autor_email, autor_nome, criado_em, editado_em, deleted_at, deleted_by, motivo_exclusao, protocol_id, protocol_source, is_important, autor_setor FROM observacoes
+WHERE protocol_id = $1 AND protocol_source = $2 AND deleted_at IS NULL
+ORDER BY is_important DESC, criado_em DESC
+`
+
+type ListObservacoesByProtocolParams struct {
+	ProtocolID     pgtype.Int4 `json:"protocol_id"`
+	ProtocolSource pgtype.Text `json:"protocol_source"`
+}
+
+func (q *Queries) ListObservacoesByProtocol(ctx context.Context, arg ListObservacoesByProtocolParams) ([]Observaco, error) {
+	rows, err := q.db.Query(ctx, listObservacoesByProtocol, arg.ProtocolID, arg.ProtocolSource)
 	if err != nil {
 		return nil, err
 	}
@@ -74,6 +138,10 @@ func (q *Queries) ListObservacoesByProtocolo(ctx context.Context, protocoloSagi 
 			&i.DeletedAt,
 			&i.DeletedBy,
 			&i.MotivoExclusao,
+			&i.ProtocolID,
+			&i.ProtocolSource,
+			&i.IsImportant,
+			&i.AutorSetor,
 		); err != nil {
 			return nil, err
 		}
@@ -85,34 +153,94 @@ func (q *Queries) ListObservacoesByProtocolo(ctx context.Context, protocoloSagi 
 	return items, nil
 }
 
-const softDeleteObservacao = `-- name: SoftDeleteObservacao :exec
+const softDeleteObservacao = `-- name: SoftDeleteObservacao :one
 UPDATE observacoes
-SET deleted_at = NOW(), deleted_by = $2, motivo_exclusao = $3
-WHERE id = $1
+SET deleted_at = NOW(), deleted_by = $2
+WHERE id = $1 AND deleted_at IS NULL RETURNING id, protocolo_sagi, texto, autor_email, autor_nome, criado_em, editado_em, deleted_at, deleted_by, motivo_exclusao, protocol_id, protocol_source, is_important, autor_setor
 `
 
 type SoftDeleteObservacaoParams struct {
-	ID             uuid.UUID   `json:"id"`
-	DeletedBy      pgtype.Text `json:"deleted_by"`
-	MotivoExclusao pgtype.Text `json:"motivo_exclusao"`
+	ID        uuid.UUID   `json:"id"`
+	DeletedBy pgtype.Text `json:"deleted_by"`
 }
 
-func (q *Queries) SoftDeleteObservacao(ctx context.Context, arg SoftDeleteObservacaoParams) error {
-	_, err := q.db.Exec(ctx, softDeleteObservacao, arg.ID, arg.DeletedBy, arg.MotivoExclusao)
-	return err
+func (q *Queries) SoftDeleteObservacao(ctx context.Context, arg SoftDeleteObservacaoParams) (Observaco, error) {
+	row := q.db.QueryRow(ctx, softDeleteObservacao, arg.ID, arg.DeletedBy)
+	var i Observaco
+	err := row.Scan(
+		&i.ID,
+		&i.ProtocoloSagi,
+		&i.Texto,
+		&i.AutorEmail,
+		&i.AutorNome,
+		&i.CriadoEm,
+		&i.EditadoEm,
+		&i.DeletedAt,
+		&i.DeletedBy,
+		&i.MotivoExclusao,
+		&i.ProtocolID,
+		&i.ProtocolSource,
+		&i.IsImportant,
+		&i.AutorSetor,
+	)
+	return i, err
 }
 
-const updateObservacao = `-- name: UpdateObservacao :exec
-UPDATE observacoes SET texto = $2, editado_em = NOW()
-WHERE id = $1
+const toggleObservacaoImportant = `-- name: ToggleObservacaoImportant :one
+UPDATE observacoes SET is_important = NOT is_important
+WHERE id = $1 AND deleted_at IS NULL RETURNING id, protocolo_sagi, texto, autor_email, autor_nome, criado_em, editado_em, deleted_at, deleted_by, motivo_exclusao, protocol_id, protocol_source, is_important, autor_setor
 `
 
-type UpdateObservacaoParams struct {
+func (q *Queries) ToggleObservacaoImportant(ctx context.Context, id uuid.UUID) (Observaco, error) {
+	row := q.db.QueryRow(ctx, toggleObservacaoImportant, id)
+	var i Observaco
+	err := row.Scan(
+		&i.ID,
+		&i.ProtocoloSagi,
+		&i.Texto,
+		&i.AutorEmail,
+		&i.AutorNome,
+		&i.CriadoEm,
+		&i.EditadoEm,
+		&i.DeletedAt,
+		&i.DeletedBy,
+		&i.MotivoExclusao,
+		&i.ProtocolID,
+		&i.ProtocolSource,
+		&i.IsImportant,
+		&i.AutorSetor,
+	)
+	return i, err
+}
+
+const updateObservacaoContent = `-- name: UpdateObservacaoContent :one
+UPDATE observacoes SET texto = $2
+WHERE id = $1 AND deleted_at IS NULL RETURNING id, protocolo_sagi, texto, autor_email, autor_nome, criado_em, editado_em, deleted_at, deleted_by, motivo_exclusao, protocol_id, protocol_source, is_important, autor_setor
+`
+
+type UpdateObservacaoContentParams struct {
 	ID    uuid.UUID `json:"id"`
 	Texto string    `json:"texto"`
 }
 
-func (q *Queries) UpdateObservacao(ctx context.Context, arg UpdateObservacaoParams) error {
-	_, err := q.db.Exec(ctx, updateObservacao, arg.ID, arg.Texto)
-	return err
+func (q *Queries) UpdateObservacaoContent(ctx context.Context, arg UpdateObservacaoContentParams) (Observaco, error) {
+	row := q.db.QueryRow(ctx, updateObservacaoContent, arg.ID, arg.Texto)
+	var i Observaco
+	err := row.Scan(
+		&i.ID,
+		&i.ProtocoloSagi,
+		&i.Texto,
+		&i.AutorEmail,
+		&i.AutorNome,
+		&i.CriadoEm,
+		&i.EditadoEm,
+		&i.DeletedAt,
+		&i.DeletedBy,
+		&i.MotivoExclusao,
+		&i.ProtocolID,
+		&i.ProtocolSource,
+		&i.IsImportant,
+		&i.AutorSetor,
+	)
+	return i, err
 }

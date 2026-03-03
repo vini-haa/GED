@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import { Search, Upload, X, Download, FileX } from 'lucide-react';
+import { Search, Upload, X, Download, FileX, Loader2 } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -17,6 +18,7 @@ import { Pagination } from '@/components/shared/Pagination';
 import { DocumentoCard } from './DocumentoCard';
 import { DocumentoViewer } from './DocumentoViewer';
 import { DeleteModal } from './DeleteModal';
+import { DocumentoUploadModal } from './DocumentoUploadModal';
 import { useDocumentos } from '@/hooks/use-documentos';
 import { useDocumentTypes } from '@/hooks/use-document-types';
 import { usePermissions } from '@/hooks/use-permissions';
@@ -25,11 +27,12 @@ import type { Documento } from '@/lib/types';
 const PER_PAGE = 10;
 
 interface DocumentoListProps {
-  protocoloSagi: string;
+  source: string;
+  id: number;
 }
 
-export function DocumentoList({ protocoloSagi }: DocumentoListProps) {
-  const { data: documentos, isLoading } = useDocumentos(protocoloSagi);
+export function DocumentoList({ source, id }: DocumentoListProps) {
+  const { data: documentos, isLoading } = useDocumentos(source, id);
   const { data: documentTypes } = useDocumentTypes();
   const { canUpload, canDelete } = usePermissions();
 
@@ -46,6 +49,8 @@ export function DocumentoList({ protocoloSagi }: DocumentoListProps) {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [deleteDoc, setDeleteDoc] = useState<Documento | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   // Filtrar documentos
   const filtered = useMemo(() => {
@@ -56,12 +61,12 @@ export function DocumentoList({ protocoloSagi }: DocumentoListProps) {
     if (busca) {
       const q = busca.toLowerCase();
       result = result.filter((d) =>
-        d.nomeArquivo.toLowerCase().includes(q)
+        d.nome_arquivo.toLowerCase().includes(q)
       );
     }
 
     if (tipoFiltro !== 'all') {
-      result = result.filter((d) => d.tipoDocumentoId === tipoFiltro);
+      result = result.filter((d) => d.tipo_documento_id === tipoFiltro);
     }
 
     return result;
@@ -79,8 +84,8 @@ export function DocumentoList({ protocoloSagi }: DocumentoListProps) {
     if (!documentos) return [];
     const map = new Map<string, string>();
     documentos.forEach((d) => {
-      if (d.tipoDocumentoId && d.tipoDocumentoNome) {
-        map.set(d.tipoDocumentoId, d.tipoDocumentoNome);
+      if (d.tipo_documento_id && d.tipo_documento_nome) {
+        map.set(d.tipo_documento_id, d.tipo_documento_nome);
       }
     });
     return Array.from(map.entries()).map(([id, nome]) => ({ id, nome }));
@@ -130,6 +135,55 @@ export function DocumentoList({ protocoloSagi }: DocumentoListProps) {
     setPage(newPage);
     setSelectedIds(new Set());
   }, []);
+
+  const handleDownloadSelected = useCallback(async () => {
+    if (selectedIds.size === 0 || downloading) return;
+    setDownloading(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const baseUrl = '/api';
+      const response = await fetch(
+        `${baseUrl}/protocolos/${source}/${id}/documentos/download-selected`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+          body: JSON.stringify({ documento_ids: Array.from(selectedIds) }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => null);
+        throw new Error(errorBody?.error?.message || `Erro ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let fileName = `selecionados_${source}_${id}.zip`;
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="(.+)"/);
+        if (match) fileName = match[1];
+      }
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setSelectedIds(new Set());
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao baixar documentos';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+    } finally {
+      setDownloading(false);
+    }
+  }, [selectedIds, downloading, source, id]);
 
   const handleClearFilters = useCallback(() => {
     setBusca('');
@@ -209,7 +263,7 @@ export function DocumentoList({ protocoloSagi }: DocumentoListProps) {
         )}
 
         {canUpload && (
-          <Button size="sm" className="h-9">
+          <Button size="sm" className="h-9" onClick={() => setUploadOpen(true)}>
             <Upload className="mr-2 h-4 w-4" />
             Anexar
           </Button>
@@ -234,9 +288,19 @@ export function DocumentoList({ protocoloSagi }: DocumentoListProps) {
 
           {selectedIds.size > 0 && (
             <div className="ml-auto flex items-center gap-2">
-              <Button variant="outline" size="sm" className="h-7 text-xs">
-                <Download className="mr-1 h-3 w-3" />
-                Baixar selecionados
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={handleDownloadSelected}
+                disabled={downloading}
+              >
+                {downloading ? (
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                ) : (
+                  <Download className="mr-1 h-3 w-3" />
+                )}
+                {downloading ? 'Baixando...' : 'Baixar selecionados'}
               </Button>
             </div>
           )}
@@ -304,6 +368,14 @@ export function DocumentoList({ protocoloSagi }: DocumentoListProps) {
         open={deleteOpen}
         onOpenChange={handleDeleteClose}
         documento={deleteDoc}
+      />
+
+      {/* Modal de upload */}
+      <DocumentoUploadModal
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
+        source={source}
+        id={id}
       />
     </div>
   );

@@ -85,15 +85,20 @@ func AuthMiddleware(pool *pgxpool.Pool, secret string) gin.HandlerFunc {
 	queries := db.New(pool)
 
 	return func(c *gin.Context) {
-		header := c.GetHeader("Authorization")
-		if header == "" {
-			authError(c, "Token de autenticação não fornecido")
-			return
-		}
+		var tokenStr string
 
-		tokenStr := strings.TrimPrefix(header, "Bearer ")
-		if tokenStr == header {
-			authError(c, "Formato de token inválido, use Bearer <token>")
+		header := c.GetHeader("Authorization")
+		if header != "" {
+			tokenStr = strings.TrimPrefix(header, "Bearer ")
+			if tokenStr == header {
+				authError(c, "Formato de token inválido, use Bearer <token>")
+				return
+			}
+		} else if qToken := c.Query("token"); qToken != "" {
+			// Fallback: aceitar token via query param (para preview em iframe/img)
+			tokenStr = qToken
+		} else {
+			authError(c, "Token de autenticação não fornecido")
 			return
 		}
 

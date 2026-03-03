@@ -19,3 +19,11 @@ WHERE id = $1;
 -- name: DeactivateTipoDocumento :exec
 UPDATE tipos_documento SET ativo = false
 WHERE id = $1;
+
+-- name: ActivateTipoDocumento :exec
+UPDATE tipos_documento SET ativo = true
+WHERE id = $1;
+
+-- name: ListAllTiposDocumento :many
+SELECT * FROM tipos_documento
+ORDER BY nome;

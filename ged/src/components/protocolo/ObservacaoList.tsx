@@ -32,11 +32,12 @@ const deleteSchema = z.object({
 type DeleteFormData = z.infer<typeof deleteSchema>;
 
 interface ObservacaoListProps {
-  protocoloSagi: string;
+  source: string;
+  id: number;
 }
 
-export function ObservacaoList({ protocoloSagi }: ObservacaoListProps) {
-  const { data: observacoes, isLoading } = useObservacoes(protocoloSagi);
+export function ObservacaoList({ source, id }: ObservacaoListProps) {
+  const { data: response, isLoading } = useObservacoes(source, id);
   const { canEdit } = usePermissions();
   const deleteMutation = useDeleteObservacao();
 
@@ -58,22 +59,24 @@ export function ObservacaoList({ protocoloSagi }: ObservacaoListProps) {
     }
   }, [deleteOpen, reset]);
 
-  // Ordenar: importantes primeiro, depois cronológica reversa
+  const observacoes = response?.data;
+
+  // Ordenar: importantes primeiro, depois cronologica reversa
   const sorted = useMemo(() => {
     if (!observacoes) return [];
 
     const importantes = observacoes
-      .filter((o) => o.importante)
+      .filter((o) => o.is_important)
       .sort(
         (a, b) =>
-          new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime()
+          new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
       );
 
     const normais = observacoes
-      .filter((o) => !o.importante)
+      .filter((o) => !o.is_important)
       .sort(
         (a, b) =>
-          new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime()
+          new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
       );
 
     return [...importantes, ...normais];
@@ -116,7 +119,7 @@ export function ObservacaoList({ protocoloSagi }: ObservacaoListProps) {
 
   return (
     <div className="space-y-4">
-      {canEdit && <ObservacaoForm protocoloSagi={protocoloSagi} />}
+      {canEdit && <ObservacaoForm source={source} id={id} />}
 
       {sorted.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-border/50 bg-card/50 py-12">
@@ -144,7 +147,7 @@ export function ObservacaoList({ protocoloSagi }: ObservacaoListProps) {
         </div>
       )}
 
-      {/* Modal de exclusão */}
+      {/* Modal de exclusao */}
       <Dialog open={deleteOpen} onOpenChange={handleDeleteClose}>
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
@@ -163,9 +166,9 @@ export function ObservacaoList({ protocoloSagi }: ObservacaoListProps) {
 
           {deleteObs && (
             <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
-              <p className="text-sm line-clamp-3">{deleteObs.texto}</p>
+              <p className="text-sm line-clamp-3">{deleteObs.content}</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Por {deleteObs.autorNome} — {deleteObs.autorSetor}
+                Por {deleteObs.created_by_name} — {deleteObs.created_by_sector}
               </p>
             </div>
           )}

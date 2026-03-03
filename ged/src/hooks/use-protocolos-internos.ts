@@ -1,193 +1,121 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getCurrentUser } from '@/lib/auth';
-import {
-  mockProtocolosInternos,
-  mockTramitacoesInternas,
-  getTramitacoesByProtocoloInterno,
-} from '@/lib/mock-protocolos-internos';
+import { apiClient } from '@/lib/api-client';
 import type {
   ProtocoloInterno,
-  ProtocoloInternoDetalhes,
+  ProtocoloInternoDetalhe,
   TramitacaoInterna,
-  StatusProtocoloInterno,
+  ListInternalProtocolsResponse,
+  MovementHistoryResponse,
   CreateProtocoloInternoRequest,
   UpdateProtocoloInternoRequest,
-  PaginatedResult,
+  ChangeStatusRequest,
+  DispatchRequest,
 } from '@/lib/types';
 
 // ============================================
-// Estado local mutável para simular persistência
-// TODO: Substituir por chamadas ao apiClient quando a API Go estiver pronta
+// Funções de fetch — chamadas à API Go real
 // ============================================
 
-let localProtocolos = [...mockProtocolosInternos];
-let localTramitacoes = [...mockTramitacoesInternas];
-let nextNumero = 16; // Próximo número para GED-2026-XXX
+interface ListInternalParams {
+  page?: number;
+  per_page?: number;
+  setor?: number;
+  status?: string;
+}
 
-// ============================================
-// Funções de fetch mock
-// ============================================
+async function fetchProtocolosInternos(
+  params?: ListInternalParams
+): Promise<ListInternalProtocolsResponse> {
+  const qs = new URLSearchParams();
+  if (params?.page) qs.set('page', String(params.page));
+  if (params?.per_page) qs.set('per_page', String(params.per_page));
+  if (params?.setor) qs.set('setor', String(params.setor));
+  if (params?.status) qs.set('status', params.status);
 
-async function fetchProtocolosInternos(): Promise<ProtocoloInterno[]> {
-  await new Promise((resolve) => setTimeout(resolve, 400));
-  return [...localProtocolos].sort(
-    (a, b) => new Date(b.atualizadoEm).getTime() - new Date(a.atualizadoEm).getTime()
+  const query = qs.toString();
+  return apiClient.get<ListInternalProtocolsResponse>(
+    `/protocolos-internos${query ? `?${query}` : ''}`
   );
 }
 
 async function fetchProtocoloInternoDetail(
-  id: string
-): Promise<ProtocoloInternoDetalhes> {
-  await new Promise((resolve) => setTimeout(resolve, 400));
-
-  const protocolo = localProtocolos.find((p) => p.id === id);
-  if (!protocolo) throw new Error('Protocolo interno não encontrado');
-
-  const tramitacoes = localTramitacoes
-    .filter((t) => t.protocoloInternoId === id)
-    .sort(
-      (a, b) =>
-        new Date(a.tramitadoEm).getTime() - new Date(b.tramitadoEm).getTime()
-    );
-
-  return { protocolo, tramitacoes };
+  id: number
+): Promise<ProtocoloInternoDetalhe> {
+  const resp = await apiClient.get<{ data: ProtocoloInternoDetalhe }>(`/protocolos-internos/${id}`);
+  return resp.data;
 }
 
 async function createProtocoloInterno(
   data: CreateProtocoloInternoRequest
 ): Promise<ProtocoloInterno> {
-  await new Promise((resolve) => setTimeout(resolve, 400));
-
-  const user = getCurrentUser();
-  const numero = `GED-2026-${String(nextNumero).padStart(3, '0')}`;
-  nextNumero++;
-
-  const novo: ProtocoloInterno = {
-    id: `gpi_${Date.now()}`,
-    numero,
-    assunto: data.assunto,
-    descricao: data.descricao || null,
-    status: 'ABERTO',
-    setorOrigem: data.setorOrigem,
-    criadoPorEmail: user.email,
-    criadoPorNome: user.name,
-    criadoEm: new Date().toISOString(),
-    atualizadoEm: new Date().toISOString(),
-  };
-
-  localProtocolos = [novo, ...localProtocolos];
-  return novo;
+  const resp = await apiClient.post<{ data: ProtocoloInterno }>('/protocolos-internos', data);
+  return resp.data;
 }
 
-async function updateProtocoloInterno(
-  params: UpdateProtocoloInternoRequest
-): Promise<ProtocoloInterno> {
-  await new Promise((resolve) => setTimeout(resolve, 300));
-
-  localProtocolos = localProtocolos.map((p) =>
-    p.id === params.id
-      ? {
-          ...p,
-          assunto: params.assunto,
-          descricao: params.descricao ?? null,
-          atualizadoEm: new Date().toISOString(),
-        }
-      : p
+async function updateProtocoloInterno(params: {
+  id: number;
+  data: UpdateProtocoloInternoRequest;
+}): Promise<ProtocoloInterno> {
+  const resp = await apiClient.patch<{ data: ProtocoloInterno }>(
+    `/protocolos-internos/${params.id}`,
+    params.data
   );
-
-  const updated = localProtocolos.find((p) => p.id === params.id);
-  if (!updated) throw new Error('Protocolo não encontrado');
-  return updated;
+  return resp.data;
 }
 
 async function updateStatusProtocoloInterno(params: {
-  id: string;
-  status: StatusProtocoloInterno;
+  id: number;
+  data: ChangeStatusRequest;
 }): Promise<ProtocoloInterno> {
-  await new Promise((resolve) => setTimeout(resolve, 300));
-
-  localProtocolos = localProtocolos.map((p) =>
-    p.id === params.id
-      ? { ...p, status: params.status, atualizadoEm: new Date().toISOString() }
-      : p
+  const resp = await apiClient.patch<{ data: ProtocoloInterno }>(
+    `/protocolos-internos/${params.id}/status`,
+    params.data
   );
-
-  const updated = localProtocolos.find((p) => p.id === params.id);
-  if (!updated) throw new Error('Protocolo não encontrado');
-  return updated;
+  return resp.data;
 }
 
 async function tramitarProtocoloInterno(params: {
-  protocoloInternoId: string;
-  paraSetor: string;
-  despacho: string;
+  id: number;
+  data: DispatchRequest;
 }): Promise<TramitacaoInterna> {
-  await new Promise((resolve) => setTimeout(resolve, 400));
-
-  const user = getCurrentUser();
-  const protocolo = localProtocolos.find(
-    (p) => p.id === params.protocoloInternoId
+  const resp = await apiClient.post<{ data: TramitacaoInterna }>(
+    `/protocolos-internos/${params.id}/tramitar`,
+    params.data
   );
-  if (!protocolo) throw new Error('Protocolo não encontrado');
+  return resp.data;
+}
 
-  // Determinar setor de origem (último destino ou setor de origem do protocolo)
-  const tramitacoesDoProtocolo = localTramitacoes
-    .filter((t) => t.protocoloInternoId === params.protocoloInternoId)
-    .sort(
-      (a, b) =>
-        new Date(b.tramitadoEm).getTime() - new Date(a.tramitadoEm).getTime()
-    );
+async function fetchTramitacaoInterna(
+  id: number
+): Promise<MovementHistoryResponse> {
+  return apiClient.get<MovementHistoryResponse>(
+    `/protocolos-internos/${id}/tramitacao`
+  );
+}
 
-  const deSetor =
-    tramitacoesDoProtocolo.length > 0
-      ? tramitacoesDoProtocolo[0].paraSetor
-      : protocolo.setorOrigem;
-
-  const novaTramitacao: TramitacaoInterna = {
-    id: `tri_${Date.now()}`,
-    protocoloInternoId: params.protocoloInternoId,
-    deSetor,
-    paraSetor: params.paraSetor,
-    despacho: params.despacho,
-    tramitadoPorEmail: user.email,
-    tramitadoPorNome: user.name,
-    tramitadoEm: new Date().toISOString(),
-  };
-
-  localTramitacoes = [...localTramitacoes, novaTramitacao];
-
-  // Atualizar status para EM_ANDAMENTO se estiver ABERTO
-  if (protocolo.status === 'ABERTO') {
-    localProtocolos = localProtocolos.map((p) =>
-      p.id === params.protocoloInternoId
-        ? { ...p, status: 'EM_ANDAMENTO' as StatusProtocoloInterno, atualizadoEm: new Date().toISOString() }
-        : p
-    );
-  } else {
-    localProtocolos = localProtocolos.map((p) =>
-      p.id === params.protocoloInternoId
-        ? { ...p, atualizadoEm: new Date().toISOString() }
-        : p
-    );
-  }
-
-  return novaTramitacao;
+async function deleteProtocoloInterno(params: {
+  id: number;
+  reason: string;
+}): Promise<void> {
+  await apiClient.delete(`/protocolos-internos/${params.id}`, {
+    reason: params.reason,
+  });
 }
 
 // ============================================
 // Hooks exportados
 // ============================================
 
-export function useProtocolosInternos() {
+export function useProtocolosInternos(params?: ListInternalParams) {
   return useQuery({
-    queryKey: ['protocolos-internos'],
-    queryFn: fetchProtocolosInternos,
+    queryKey: ['protocolos-internos', params],
+    queryFn: () => fetchProtocolosInternos(params),
   });
 }
 
-export function useProtocoloInternoDetail(id: string) {
+export function useProtocoloInternoDetail(id: number) {
   return useQuery({
     queryKey: ['protocolo-interno', id],
     queryFn: () => fetchProtocoloInternoDetail(id),
@@ -242,8 +170,30 @@ export function useTramitarProtocoloInterno() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['protocolos-internos'] });
       queryClient.invalidateQueries({
-        queryKey: ['protocolo-interno', variables.protocoloInternoId],
+        queryKey: ['protocolo-interno', variables.id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['tramitacao-interna', variables.id],
       });
     },
+  });
+}
+
+export function useDeleteProtocoloInterno() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: deleteProtocoloInterno,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['protocolos-internos'] });
+    },
+  });
+}
+
+export function useTramitacaoInterna(id: number) {
+  return useQuery({
+    queryKey: ['tramitacao-interna', id],
+    queryFn: () => fetchTramitacaoInterna(id),
+    enabled: !!id,
   });
 }

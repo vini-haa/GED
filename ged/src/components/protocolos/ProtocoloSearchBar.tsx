@@ -8,8 +8,8 @@ import { Search, X } from 'lucide-react';
 interface ProtocoloSearchBarProps {
   value: string;
   onSearch: (value: string) => void;
-  scope: 'my-sector' | 'all';
-  onScopeChange: (scope: 'my-sector' | 'all') => void;
+  scope: 'meu_setor' | 'todos';
+  onScopeChange: (scope: 'meu_setor' | 'todos') => void;
 }
 
 export function ProtocoloSearchBar({
@@ -50,7 +50,7 @@ export function ProtocoloSearchBar({
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           ref={inputRef}
-          placeholder="Buscar por número, assunto, projeto ou setor..."
+          placeholder="Buscar por numero, assunto, projeto ou setor..."
           value={localValue}
           onChange={(e) => handleChange(e.target.value)}
           className="pl-10 pr-10"
@@ -66,18 +66,18 @@ export function ProtocoloSearchBar({
       </div>
       <div className="flex items-center gap-1 rounded-lg border border-border/50 p-1">
         <Button
-          variant={scope === 'my-sector' ? 'default' : 'ghost'}
+          variant={scope === 'meu_setor' ? 'default' : 'ghost'}
           size="sm"
           className="h-7 text-xs"
-          onClick={() => onScopeChange('my-sector')}
+          onClick={() => onScopeChange('meu_setor')}
         >
           Meu Setor
         </Button>
         <Button
-          variant={scope === 'all' ? 'default' : 'ghost'}
+          variant={scope === 'todos' ? 'default' : 'ghost'}
           size="sm"
           className="h-7 text-xs"
-          onClick={() => onScopeChange('all')}
+          onClick={() => onScopeChange('todos')}
         >
           Todos
         </Button>

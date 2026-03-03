@@ -30,7 +30,21 @@ export function ChartDocsPorTipo({ data, isLoading }: ChartDocsPorTipoProps) {
     );
   }
 
-  if (!data || data.length === 0) return null;
+  if (!data || data.length === 0) {
+    return (
+      <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+        <h3 className="text-sm font-medium">Documentos por Tipo</h3>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Distribuição por categoria
+        </p>
+        <div className="mt-4 flex h-[220px] items-center justify-center">
+          <p className="text-sm text-muted-foreground">
+            Nenhum documento registrado no período
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const total = data.reduce((sum, d) => sum + d.quantidade, 0);
 

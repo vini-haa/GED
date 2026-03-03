@@ -62,12 +62,14 @@ export function DocumentoCard({
   onDelete,
 }: DocumentoCardProps) {
   const { canDelete } = usePermissions();
-  const Icon = getMimeIcon(documento.mimeType);
+  const Icon = getMimeIcon(documento.mime_type);
 
-  const timeAgo = formatDistanceToNow(new Date(documento.uploadedAt), {
+  const timeAgo = documento.uploaded_at
+    ? formatDistanceToNow(new Date(documento.uploaded_at), {
     addSuffix: true,
     locale: ptBR,
-  });
+  })
+    : '—';
 
   return (
     <div
@@ -94,18 +96,18 @@ export function DocumentoCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <p className="truncate text-sm font-medium">
-              {documento.nomeArquivo}
+              {documento.nome_arquivo}
             </p>
-            {documento.tipoDocumentoNome && (
+            {documento.tipo_documento_nome && (
               <Badge variant="outline" className="shrink-0 text-[10px] px-1.5 py-0">
-                {documento.tipoDocumentoNome}
+                {documento.tipo_documento_nome}
               </Badge>
             )}
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span>{formatFileSize(documento.tamanhoBytes)}</span>
+            <span>{formatFileSize(documento.tamanho_bytes)}</span>
             <span className="hidden sm:inline">·</span>
-            <span className="hidden sm:inline">{documento.uploadedBy}</span>
+            <span className="hidden sm:inline">{documento.uploaded_by_name}</span>
             <span>·</span>
             <span>{timeAgo}</span>
           </div>

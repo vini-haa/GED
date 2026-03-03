@@ -8,7 +8,6 @@ import { Loader2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -21,13 +20,21 @@ import { useUpdateProtocoloInterno } from '@/hooks/use-protocolos-internos';
 import type { ProtocoloInterno } from '@/lib/types';
 
 const schema = z.object({
-  assunto: z
+  subject: z
     .string()
     .min(5, 'Assunto deve ter pelo menos 5 caracteres')
-    .max(200, 'Assunto deve ter no máximo 200 caracteres'),
-  descricao: z
+    .max(200, 'Assunto deve ter no maximo 200 caracteres'),
+  interested: z
     .string()
-    .max(2000, 'Descrição deve ter no máximo 2000 caracteres')
+    .min(1, 'Interessado e obrigatorio')
+    .max(200, 'Interessado deve ter no maximo 200 caracteres'),
+  sender: z
+    .string()
+    .min(1, 'Remetente e obrigatorio')
+    .max(200, 'Remetente deve ter no maximo 200 caracteres'),
+  project_name: z
+    .string()
+    .max(200, 'Nome do projeto deve ter no maximo 200 caracteres')
     .optional()
     .transform((v) => (v && v.trim().length > 0 ? v.trim() : undefined)),
 });
@@ -51,22 +58,23 @@ export function EditarProtocoloModal({
     register,
     handleSubmit,
     reset,
-    watch,
     formState: { errors, isDirty },
   } = useForm<FormData>({
     defaultValues: {
-      assunto: protocolo.assunto,
-      descricao: protocolo.descricao ?? '',
+      subject: protocolo.subject,
+      interested: protocolo.interested,
+      sender: protocolo.sender,
+      project_name: protocolo.project_name ?? '',
     },
   });
-
-  const descricao = watch('descricao') ?? '';
 
   useEffect(() => {
     if (open) {
       reset({
-        assunto: protocolo.assunto,
-        descricao: protocolo.descricao ?? '',
+        subject: protocolo.subject,
+        interested: protocolo.interested,
+        sender: protocolo.sender,
+        project_name: protocolo.project_name ?? '',
       });
     }
   }, [open, protocolo, reset]);
@@ -78,8 +86,12 @@ export function EditarProtocoloModal({
     updateMutation.mutate(
       {
         id: protocolo.id,
-        assunto: parsed.data.assunto,
-        descricao: parsed.data.descricao,
+        data: {
+          subject: parsed.data.subject,
+          interested: parsed.data.interested,
+          sender: parsed.data.sender,
+          project_name: parsed.data.project_name,
+        },
       },
       {
         onSuccess: () => onOpenChange(false),
@@ -98,8 +110,8 @@ export function EditarProtocoloModal({
             <div>
               <DialogTitle>Editar Protocolo</DialogTitle>
               <DialogDescription>
-                Altere o assunto ou a descrição do protocolo{' '}
-                <span className="font-medium">{protocolo.numero}</span>.
+                Altere os dados do protocolo{' '}
+                <span className="font-medium">{protocolo.protocol_number}</span>.
               </DialogDescription>
             </div>
           </div>
@@ -108,50 +120,68 @@ export function EditarProtocoloModal({
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {/* Assunto */}
           <div className="space-y-2">
-            <Label htmlFor="edit-assunto">
+            <Label htmlFor="edit-subject">
               Assunto <span className="text-destructive">*</span>
             </Label>
             <Input
-              id="edit-assunto"
-              placeholder="Ex: Solicitação de compra de material..."
-              {...register('assunto')}
+              id="edit-subject"
+              placeholder="Ex: Solicitacao de compra de material..."
+              {...register('subject')}
             />
-            {errors.assunto && (
+            {errors.subject && (
               <p className="text-sm text-destructive">
-                {errors.assunto.message}
+                {errors.subject.message}
               </p>
             )}
           </div>
 
-          {/* Descrição */}
+          {/* Interessado */}
           <div className="space-y-2">
-            <Label htmlFor="edit-descricao">Descrição</Label>
-            <Textarea
-              id="edit-descricao"
-              placeholder="Descreva os detalhes do protocolo (opcional)..."
-              rows={4}
-              {...register('descricao')}
+            <Label htmlFor="edit-interested">
+              Interessado <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="edit-interested"
+              placeholder="Nome do interessado..."
+              {...register('interested')}
             />
-            <div className="flex items-center justify-between">
-              {errors.descricao ? (
-                <p className="text-sm text-destructive">
-                  {errors.descricao.message}
-                </p>
-              ) : (
-                <span />
-              )}
-              <span
-                className={`text-xs ${
-                  descricao.length > 1800
-                    ? descricao.length > 2000
-                      ? 'font-medium text-destructive'
-                      : 'text-amber-600'
-                    : 'text-muted-foreground'
-                }`}
-              >
-                {descricao.length}/2000
-              </span>
-            </div>
+            {errors.interested && (
+              <p className="text-sm text-destructive">
+                {errors.interested.message}
+              </p>
+            )}
+          </div>
+
+          {/* Remetente */}
+          <div className="space-y-2">
+            <Label htmlFor="edit-sender">
+              Remetente <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="edit-sender"
+              placeholder="Nome do remetente..."
+              {...register('sender')}
+            />
+            {errors.sender && (
+              <p className="text-sm text-destructive">
+                {errors.sender.message}
+              </p>
+            )}
+          </div>
+
+          {/* Nome do Projeto */}
+          <div className="space-y-2">
+            <Label htmlFor="edit-project_name">Nome do Projeto</Label>
+            <Input
+              id="edit-project_name"
+              placeholder="Nome do projeto relacionado (opcional)..."
+              {...register('project_name')}
+            />
+            {errors.project_name && (
+              <p className="text-sm text-destructive">
+                {errors.project_name.message}
+              </p>
+            )}
           </div>
 
           <DialogFooter>

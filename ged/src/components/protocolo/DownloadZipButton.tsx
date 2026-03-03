@@ -10,9 +10,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { toast } from '@/hooks/use-toast';
 
 interface DownloadZipButtonProps {
-  protocoloSagi: string;
+  source: string;
+  id: string | number;
   documentCount: number;
   disabled?: boolean;
 }
@@ -20,7 +22,8 @@ interface DownloadZipButtonProps {
 type DownloadStatus = 'idle' | 'downloading' | 'done';
 
 export function DownloadZipButton({
-  protocoloSagi,
+  source,
+  id,
   documentCount,
   disabled = false,
 }: DownloadZipButtonProps) {
@@ -31,23 +34,64 @@ export function DownloadZipButton({
     if (status !== 'idle' || documentCount === 0) return;
 
     setStatus('downloading');
-    setProgress(0);
+    setProgress(20);
 
-    // Mock: simula download em lote
-    // TODO: substituir por chamada real ao endpoint de download ZIP
-    const steps = [15, 35, 55, 75, 95, 100];
-    for (const step of steps) {
-      await new Promise((resolve) => setTimeout(resolve, 250));
-      setProgress(step);
-    }
+    try {
+      const token = localStorage.getItem('auth_token');
+      const baseUrl = '/api';
 
-    setStatus('done');
+      setProgress(40);
 
-    setTimeout(() => {
+      const response = await fetch(
+        `${baseUrl}/protocolos/${source}/${id}/documentos/download-zip`,
+        {
+          method: 'POST',
+          headers: {
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+        }
+      );
+
+      setProgress(70);
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => null);
+        throw new Error(errorBody?.error?.message || `Erro ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      setProgress(90);
+
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let fileName = `documentos_${source}_${id}.zip`;
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="(.+)"/);
+        if (match) fileName = match[1];
+      }
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setProgress(100);
+      setStatus('done');
+
+      setTimeout(() => {
+        setStatus('idle');
+        setProgress(0);
+      }, 2000);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao baixar documentos';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
       setStatus('idle');
       setProgress(0);
-    }, 2000);
-  }, [status, documentCount]);
+    }
+  }, [status, documentCount, source, id]);
 
   const isDisabled = disabled || documentCount === 0 || status === 'downloading';
 

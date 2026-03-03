@@ -11,10 +11,11 @@ import { useCreateObservacao } from '@/hooks/use-observacoes';
 const MAX_LENGTH = 2000;
 
 interface ObservacaoFormProps {
-  protocoloSagi: string;
+  source: string;
+  id: number;
 }
 
-export function ObservacaoForm({ protocoloSagi }: ObservacaoFormProps) {
+export function ObservacaoForm({ source, id }: ObservacaoFormProps) {
   const [texto, setTexto] = useState('');
   const [importante, setImportante] = useState(false);
   const createMutation = useCreateObservacao();
@@ -27,7 +28,7 @@ export function ObservacaoForm({ protocoloSagi }: ObservacaoFormProps) {
     if (isEmpty || isOverLimit) return;
 
     createMutation.mutate(
-      { protocoloSagi, texto: texto.trim(), importante },
+      { source, id, content: texto.trim(), is_important: importante },
       {
         onSuccess: () => {
           setTexto('');
@@ -35,7 +36,7 @@ export function ObservacaoForm({ protocoloSagi }: ObservacaoFormProps) {
         },
       }
     );
-  }, [protocoloSagi, texto, importante, isEmpty, isOverLimit, createMutation]);
+  }, [source, id, texto, importante, isEmpty, isOverLimit, createMutation]);
 
   return (
     <div className="rounded-xl border border-border/50 bg-card/50 p-4 space-y-3">

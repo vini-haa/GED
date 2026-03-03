@@ -188,7 +188,7 @@ export function AdminsTab() {
             </TableHeader>
             <TableBody>
               {paginated.map((admin) => {
-                const isSelf = admin.email === user.email;
+                const isSelf = admin.email === user?.email;
                 const isSA = admin.gedRole === 'super_admin';
 
                 return (

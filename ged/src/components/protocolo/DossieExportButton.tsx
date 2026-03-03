@@ -10,8 +10,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { toast } from '@/hooks/use-toast';
 
 interface DossieExportButtonProps {
+  source: string;
+  id: string | number;
   protocoloSagi: string;
   disabled?: boolean;
 }
@@ -19,6 +22,8 @@ interface DossieExportButtonProps {
 type ExportStatus = 'idle' | 'generating' | 'done';
 
 export function DossieExportButton({
+  source,
+  id,
   protocoloSagi,
   disabled = false,
 }: DossieExportButtonProps) {
@@ -29,24 +34,64 @@ export function DossieExportButton({
     if (status !== 'idle') return;
 
     setStatus('generating');
-    setProgress(0);
+    setProgress(15);
 
-    // Mock: simula progresso de geração do dossiê
-    // TODO: substituir por chamada real ao endpoint de geração
-    const steps = [10, 25, 45, 60, 75, 90, 100];
-    for (const step of steps) {
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      setProgress(step);
-    }
+    try {
+      const token = localStorage.getItem('auth_token');
+      const baseUrl = '/api';
 
-    setStatus('done');
+      setProgress(30);
 
-    // Volta ao estado idle após 2s
-    setTimeout(() => {
+      const response = await fetch(
+        `${baseUrl}/protocolos/${source}/${id}/dossie/export`,
+        {
+          method: 'POST',
+          headers: {
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+        }
+      );
+
+      setProgress(60);
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => null);
+        throw new Error(errorBody?.error?.message || `Erro ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      setProgress(85);
+
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let fileName = `dossie_${protocoloSagi.replace(/\./g, '_')}.zip`;
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="(.+)"/);
+        if (match) fileName = match[1];
+      }
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setProgress(100);
+      setStatus('done');
+
+      setTimeout(() => {
+        setStatus('idle');
+        setProgress(0);
+      }, 2000);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao gerar dossiê';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
       setStatus('idle');
       setProgress(0);
-    }, 2000);
-  }, [status]);
+    }
+  }, [status, source, id, protocoloSagi]);
 
   return (
     <TooltipProvider delayDuration={300}>

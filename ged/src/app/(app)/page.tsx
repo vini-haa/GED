@@ -2,9 +2,13 @@
 
 import { ProtocoloCounters } from '@/components/protocolos/ProtocoloCounters';
 import { ProtocoloTabs } from '@/components/protocolos/ProtocoloTabs';
+import { useUserSector } from '@/hooks/use-user-sector';
 import { FileText } from 'lucide-react';
 
 export default function ProtocolosPage() {
+  const { codSetor } = useUserSector();
+  const setorNumerico = codSetor && !isNaN(Number(codSetor)) ? Number(codSetor) : null;
+
   return (
     <div className="space-y-6">
       <div>
@@ -16,7 +20,7 @@ export default function ProtocolosPage() {
           Gerencie e acompanhe todos os protocolos do seu setor.
         </p>
       </div>
-      <ProtocoloCounters />
+      <ProtocoloCounters setor={setorNumerico} />
       <ProtocoloTabs />
     </div>
   );

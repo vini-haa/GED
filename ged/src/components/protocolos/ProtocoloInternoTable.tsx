@@ -30,9 +30,12 @@ import {
 } from '@/components/ui/table';
 import { StatusBadge } from '@/components/protocolo-interno/StatusDropdown';
 import { useProtocolosInternos } from '@/hooks/use-protocolos-internos';
+import { formatSectorName } from '@/lib/types';
 
 export function ProtocoloInternoTable() {
-  const { data, isLoading } = useProtocolosInternos();
+  const { data: response, isLoading } = useProtocolosInternos();
+
+  const items = response?.data ?? [];
 
   if (isLoading) {
     return (
@@ -54,7 +57,7 @@ export function ProtocoloInternoTable() {
     );
   }
 
-  if (!data || data.length === 0) {
+  if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-border/50 bg-card/50 py-16">
         <Inbox className="h-10 w-10 text-muted-foreground/50" />
@@ -75,7 +78,7 @@ export function ProtocoloInternoTable() {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {data.length} protocolo{data.length !== 1 ? 's' : ''} interno{data.length !== 1 ? 's' : ''}
+          {items.length} protocolo{items.length !== 1 ? 's' : ''} interno{items.length !== 1 ? 's' : ''}
         </p>
         <Button size="sm" asChild>
           <Link href="/protocolo-interno/novo" className="gap-2">
@@ -92,82 +95,74 @@ export function ProtocoloInternoTable() {
               <TableHead>Protocolo</TableHead>
               <TableHead>Assunto</TableHead>
               <TableHead className="hidden md:table-cell">
-                Setor Origem
+                Setor Atual
               </TableHead>
               <TableHead className="text-center">Status</TableHead>
               <TableHead className="hidden sm:table-cell">
-                Atualizado
+                Criado
               </TableHead>
               <TableHead>
-                <span className="sr-only">Ações</span>
+                <span className="sr-only">Acoes</span>
               </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((protocolo) => {
-              const isRecent =
-                new Date().getTime() -
-                  new Date(protocolo.atualizadoEm).getTime() <
-                24 * 60 * 60 * 1000;
-
-              return (
-                <TableRow
-                  key={protocolo.id}
-                  className="!border-border/30 hover:!bg-muted/20"
-                >
-                  <TableCell className="font-medium">
-                    <Link
-                      href={`/protocolo-interno/${protocolo.id}`}
-                      className="inline-flex items-center gap-1.5 hover:underline"
-                    >
-                      <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
-                      {protocolo.numero}
-                    </Link>
-                    {isRecent && (
-                      <span className="ml-2 inline-block h-2 w-2 rounded-full bg-blue-500" />
-                    )}
-                  </TableCell>
-                  <TableCell className="max-w-[200px] truncate">
-                    {protocolo.assunto}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    {protocolo.setorOrigem}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <StatusBadge status={protocolo.status} />
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell text-muted-foreground">
-                    {formatDistanceToNow(
-                      new Date(protocolo.atualizadoEm),
-                      { addSuffix: true, locale: ptBR }
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          aria-haspopup="true"
-                          size="icon"
-                          variant="ghost"
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">Abrir menu</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                        <DropdownMenuItem asChild>
-                          <Link href={`/protocolo-interno/${protocolo.id}`}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            Ver Detalhes
-                          </Link>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+            {items.map((protocolo) => (
+              <TableRow
+                key={protocolo.id}
+                className="!border-border/30 hover:!bg-muted/20"
+              >
+                <TableCell className="font-medium">
+                  <Link
+                    href={`/protocolo-interno/${protocolo.id}`}
+                    className="inline-flex items-center gap-1.5 hover:underline"
+                  >
+                    <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
+                    {protocolo.protocol_number}
+                  </Link>
+                </TableCell>
+                <TableCell className="max-w-[200px] truncate">
+                  {protocolo.subject}
+                </TableCell>
+                <TableCell className="hidden md:table-cell">
+                  {formatSectorName(protocolo.current_sector_name)}
+                </TableCell>
+                <TableCell className="text-center">
+                  <StatusBadge status={protocolo.status} />
+                </TableCell>
+                <TableCell className="hidden sm:table-cell text-muted-foreground">
+                  {protocolo.created_at
+                    ? formatDistanceToNow(
+                        new Date(protocolo.created_at),
+                        { addSuffix: true, locale: ptBR }
+                      )
+                    : '—'}
+                </TableCell>
+                <TableCell>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        aria-haspopup="true"
+                        size="icon"
+                        variant="ghost"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                        <span className="sr-only">Abrir menu</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Acoes</DropdownMenuLabel>
+                      <DropdownMenuItem asChild>
+                        <Link href={`/protocolo-interno/${protocolo.id}`}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          Ver Detalhes
+                        </Link>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       </div>

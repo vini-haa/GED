@@ -1,62 +1,115 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { mockDocumentos, getDocumentosByProtocolo } from '@/lib/mock-documentos';
-import { mockProtocols } from '@/lib/mock-protocols';
-import type { Documento, Protocol } from '@/lib/types';
-
-// Estado local mutável para simular persistência durante a sessão
-let localDocumentos = [...mockDocumentos];
+import { apiClient } from '@/lib/api-client';
+import type {
+  Documento,
+  ListDocumentosResponse,
+  ProtocoloDetalhe,
+} from '@/lib/types';
 
 // ============================================
-// Funções de fetch mock
-// TODO: Substituir por chamadas ao apiClient quando a API Go estiver pronta
+// Funções de fetch — chamadas à API Go real
 // ============================================
 
-async function fetchDocumentos(protocoloSagi: string): Promise<Documento[]> {
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  return localDocumentos.filter((d) => d.protocoloSagi === protocoloSagi);
+async function fetchProtocoloDetalhes(
+  source: string,
+  id: number
+): Promise<ProtocoloDetalhe> {
+  const resp = await apiClient.get<{ data: ProtocoloDetalhe }>(
+    `/protocolos/${source}/${id}`
+  );
+  return resp.data;
+}
+
+async function fetchDocumentos(
+  source: string,
+  id: number
+): Promise<Documento[]> {
+  const resp = await apiClient.get<ListDocumentosResponse>(
+    `/protocolos/${source}/${id}/documentos`
+  );
+  return resp.data;
+}
+
+async function uploadDocumento(params: {
+  source: string;
+  id: number;
+  formData: FormData;
+}): Promise<Documento> {
+  return apiClient.upload<Documento>(
+    `/protocolos/${params.source}/${params.id}/documentos`,
+    params.formData
+  );
+}
+
+async function updateDocumento(params: {
+  id: string;
+  descricao?: string;
+  tipo_documento_id?: string;
+}): Promise<Documento> {
+  const { id, ...body } = params;
+  return apiClient.patch<Documento>(`/documentos/${id}`, body);
 }
 
 async function deleteDocumento(params: {
   id: string;
-  motivo: string;
+  motivo_exclusao: string;
 }): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 400));
-  localDocumentos = localDocumentos.filter((d) => d.id !== params.id);
+  await apiClient.post(`/documentos/${params.id}/delete`, {
+    motivo_exclusao: params.motivo_exclusao,
+  });
 }
 
-async function fetchProtocoloDetalhes(
-  numero: number,
-  ano: number
-): Promise<{ protocolo: Protocol; documentos: Documento[] }> {
-  await new Promise((resolve) => setTimeout(resolve, 400));
+async function downloadDocumento(id: string): Promise<Blob> {
+  const url = `/api/documentos/${id}/download`;
+  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
 
-  const protocolo = mockProtocols.find(
-    (p) => p.numeroProtocolo === numero && p.anoProtocolo === ano
-  );
+  const response = await fetch(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
 
-  if (!protocolo) {
-    throw new Error('Protocolo não encontrado');
+  if (!response.ok) {
+    throw new Error(`Download falhou: ${response.status}`);
   }
 
-  const protocoloSagi = `${numero}/${ano}`;
-  const documentos = localDocumentos.filter(
-    (d) => d.protocoloSagi === protocoloSagi
-  );
-
-  return { protocolo, documentos };
+  return response.blob();
 }
 
 // ============================================
 // Hooks exportados
 // ============================================
 
-export function useDocumentos(protocoloSagi: string) {
+export function useDocumentos(source: string, id: number) {
   return useQuery({
-    queryKey: ['documentos', protocoloSagi],
-    queryFn: () => fetchDocumentos(protocoloSagi),
-    enabled: !!protocoloSagi,
+    queryKey: ['documentos', source, id],
+    queryFn: () => fetchDocumentos(source, id),
+    enabled: !!id,
+  });
+}
+
+export function useUploadDocumento() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: uploadDocumento,
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ['documentos', variables.source, variables.id],
+      });
+      queryClient.invalidateQueries({ queryKey: ['protocolo-detalhes'] });
+    },
+  });
+}
+
+export function useUpdateDocumento() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: updateDocumento,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documentos'] });
+    },
   });
 }
 
@@ -72,10 +125,16 @@ export function useDeleteDocumento() {
   });
 }
 
-export function useProtocoloDetalhes(numero: number, ano: number) {
+export function useDownloadDocumento() {
+  return useMutation({
+    mutationFn: downloadDocumento,
+  });
+}
+
+export function useProtocoloDetalhes(source: string, id: number) {
   return useQuery({
-    queryKey: ['protocolo-detalhes', numero, ano],
-    queryFn: () => fetchProtocoloDetalhes(numero, ano),
-    enabled: !!numero && !!ano,
+    queryKey: ['protocolo-detalhes', source, id],
+    queryFn: () => fetchProtocoloDetalhes(source, id),
+    enabled: !!id,
   });
 }

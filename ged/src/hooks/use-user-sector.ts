@@ -1,34 +1,31 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { getCurrentUser } from '@/lib/auth';
+import { apiClient, ApiResponse } from '@/lib/api-client';
+import type { CurrentUser } from '@/lib/types';
 
-interface UserSector {
-  codSetor: number;
-  nomeSetor: string;
+async function fetchCurrentUser(): Promise<CurrentUser> {
+  const resp = await apiClient.get<ApiResponse<CurrentUser>>('/me');
+  return resp.data;
 }
 
-async function fetchUserSector(): Promise<UserSector> {
-  // TODO: Substituir por chamada real ao endpoint GET /api/user/me
-  // quando o backend estiver pronto
-  await new Promise((resolve) => setTimeout(resolve, 200));
-  const user = getCurrentUser();
-  return {
-    codSetor: user.codSetor,
-    nomeSetor: user.nomeSetor,
-  };
+export function useCurrentUser() {
+  return useQuery({
+    queryKey: ['current-user'],
+    queryFn: fetchCurrentUser,
+    staleTime: 5 * 60 * 1000,
+  });
 }
 
 export function useUserSector() {
-  const query = useQuery({
-    queryKey: ['user-sector'],
-    queryFn: fetchUserSector,
-    staleTime: 5 * 60 * 1000, // 5 minutos (setor muda raramente)
-  });
+  const query = useCurrentUser();
 
   return {
-    codSetor: query.data?.codSetor ?? null,
-    nomeSetor: query.data?.nomeSetor ?? null,
+    codSetor: query.data?.setor ?? null,
+    nomeSetor: query.data?.setor ?? null,
+    email: query.data?.email ?? null,
+    nome: query.data?.nome ?? null,
+    role: query.data?.role ?? null,
     isLoading: query.isLoading,
     error: query.error,
   };

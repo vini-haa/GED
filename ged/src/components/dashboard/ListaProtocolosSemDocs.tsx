@@ -53,7 +53,24 @@ export function ListaProtocolosSemDocs({
     );
   }
 
-  if (!data || data.length === 0) return null;
+  if (!data || data.length === 0) {
+    return (
+      <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-amber-500" />
+          <h3 className="text-sm font-medium">Protocolos sem Documentos</h3>
+        </div>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Protocolos que precisam de atenção
+        </p>
+        <div className="mt-4 flex h-[160px] items-center justify-center">
+          <p className="text-sm text-muted-foreground">
+            Todos os protocolos possuem documentos anexados
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-xl border border-border/50 bg-card/50 p-4">

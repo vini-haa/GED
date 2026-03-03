@@ -24,25 +24,41 @@ func (q *Queries) CountDocumentosByProtocolo(ctx context.Context, protocoloSagi 
 	return count, err
 }
 
+const countObservacoesByProtocolo = `-- name: CountObservacoesByProtocolo :one
+SELECT COUNT(*) FROM observacoes
+WHERE protocolo_sagi = $1 AND deleted_at IS NULL
+`
+
+func (q *Queries) CountObservacoesByProtocolo(ctx context.Context, protocoloSagi string) (int64, error) {
+	row := q.db.QueryRow(ctx, countObservacoesByProtocolo, protocoloSagi)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createDocumento = `-- name: CreateDocumento :one
 INSERT INTO documentos (
     protocolo_sagi, tipo_documento_id, nome_arquivo,
     drive_file_id, drive_file_url, tamanho_bytes,
-    mime_type, hash_sha256, uploaded_by
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, protocolo_sagi, tipo_documento_id, nome_arquivo, drive_file_id, drive_file_url, tamanho_bytes, mime_type, hash_sha256, uploaded_by, uploaded_at, deleted_at, deleted_by, motivo_exclusao
+    mime_type, hash_sha256, uploaded_by,
+    descricao, uploaded_by_name, google_drive_folder_id
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+RETURNING id, protocolo_sagi, tipo_documento_id, nome_arquivo, drive_file_id, drive_file_url, tamanho_bytes, mime_type, hash_sha256, uploaded_by, uploaded_at, deleted_at, deleted_by, motivo_exclusao, descricao, uploaded_by_name, google_drive_folder_id
 `
 
 type CreateDocumentoParams struct {
-	ProtocoloSagi   string      `json:"protocolo_sagi"`
-	TipoDocumentoID pgtype.UUID `json:"tipo_documento_id"`
-	NomeArquivo     string      `json:"nome_arquivo"`
-	DriveFileID     pgtype.Text `json:"drive_file_id"`
-	DriveFileUrl    pgtype.Text `json:"drive_file_url"`
-	TamanhoBytes    pgtype.Int8 `json:"tamanho_bytes"`
-	MimeType        pgtype.Text `json:"mime_type"`
-	HashSha256      pgtype.Text `json:"hash_sha256"`
-	UploadedBy      string      `json:"uploaded_by"`
+	ProtocoloSagi       string      `json:"protocolo_sagi"`
+	TipoDocumentoID     pgtype.UUID `json:"tipo_documento_id"`
+	NomeArquivo         string      `json:"nome_arquivo"`
+	DriveFileID         pgtype.Text `json:"drive_file_id"`
+	DriveFileUrl        pgtype.Text `json:"drive_file_url"`
+	TamanhoBytes        pgtype.Int8 `json:"tamanho_bytes"`
+	MimeType            pgtype.Text `json:"mime_type"`
+	HashSha256          pgtype.Text `json:"hash_sha256"`
+	UploadedBy          string      `json:"uploaded_by"`
+	Descricao           pgtype.Text `json:"descricao"`
+	UploadedByName      pgtype.Text `json:"uploaded_by_name"`
+	GoogleDriveFolderID pgtype.Text `json:"google_drive_folder_id"`
 }
 
 func (q *Queries) CreateDocumento(ctx context.Context, arg CreateDocumentoParams) (Documento, error) {
@@ -56,6 +72,9 @@ func (q *Queries) CreateDocumento(ctx context.Context, arg CreateDocumentoParams
 		arg.MimeType,
 		arg.HashSha256,
 		arg.UploadedBy,
+		arg.Descricao,
+		arg.UploadedByName,
+		arg.GoogleDriveFolderID,
 	)
 	var i Documento
 	err := row.Scan(
@@ -73,12 +92,15 @@ func (q *Queries) CreateDocumento(ctx context.Context, arg CreateDocumentoParams
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.MotivoExclusao,
+		&i.Descricao,
+		&i.UploadedByName,
+		&i.GoogleDriveFolderID,
 	)
 	return i, err
 }
 
 const getDocumentoByID = `-- name: GetDocumentoByID :one
-SELECT id, protocolo_sagi, tipo_documento_id, nome_arquivo, drive_file_id, drive_file_url, tamanho_bytes, mime_type, hash_sha256, uploaded_by, uploaded_at, deleted_at, deleted_by, motivo_exclusao FROM documentos
+SELECT id, protocolo_sagi, tipo_documento_id, nome_arquivo, drive_file_id, drive_file_url, tamanho_bytes, mime_type, hash_sha256, uploaded_by, uploaded_at, deleted_at, deleted_by, motivo_exclusao, descricao, uploaded_by_name, google_drive_folder_id FROM documentos
 WHERE id = $1 AND deleted_at IS NULL
 `
 
@@ -100,12 +122,74 @@ func (q *Queries) GetDocumentoByID(ctx context.Context, id uuid.UUID) (Documento
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.MotivoExclusao,
+		&i.Descricao,
+		&i.UploadedByName,
+		&i.GoogleDriveFolderID,
+	)
+	return i, err
+}
+
+const getDocumentoByIDWithType = `-- name: GetDocumentoByIDWithType :one
+SELECT
+    d.id, d.protocolo_sagi, d.tipo_documento_id, d.nome_arquivo,
+    d.drive_file_id, d.drive_file_url, d.tamanho_bytes, d.mime_type,
+    d.hash_sha256, d.uploaded_by, d.uploaded_at, d.deleted_at, d.deleted_by,
+    d.motivo_exclusao, d.descricao, d.uploaded_by_name, d.google_drive_folder_id,
+    COALESCE(td.nome, '') AS tipo_documento_nome
+FROM documentos d
+LEFT JOIN tipos_documento td ON td.id = d.tipo_documento_id
+WHERE d.id = $1 AND d.deleted_at IS NULL
+`
+
+type GetDocumentoByIDWithTypeRow struct {
+	ID                  uuid.UUID        `json:"id"`
+	ProtocoloSagi       string           `json:"protocolo_sagi"`
+	TipoDocumentoID     pgtype.UUID      `json:"tipo_documento_id"`
+	NomeArquivo         string           `json:"nome_arquivo"`
+	DriveFileID         pgtype.Text      `json:"drive_file_id"`
+	DriveFileUrl        pgtype.Text      `json:"drive_file_url"`
+	TamanhoBytes        pgtype.Int8      `json:"tamanho_bytes"`
+	MimeType            pgtype.Text      `json:"mime_type"`
+	HashSha256          pgtype.Text      `json:"hash_sha256"`
+	UploadedBy          string           `json:"uploaded_by"`
+	UploadedAt          pgtype.Timestamp `json:"uploaded_at"`
+	DeletedAt           pgtype.Timestamp `json:"deleted_at"`
+	DeletedBy           pgtype.Text      `json:"deleted_by"`
+	MotivoExclusao      pgtype.Text      `json:"motivo_exclusao"`
+	Descricao           pgtype.Text      `json:"descricao"`
+	UploadedByName      pgtype.Text      `json:"uploaded_by_name"`
+	GoogleDriveFolderID pgtype.Text      `json:"google_drive_folder_id"`
+	TipoDocumentoNome   string           `json:"tipo_documento_nome"`
+}
+
+func (q *Queries) GetDocumentoByIDWithType(ctx context.Context, id uuid.UUID) (GetDocumentoByIDWithTypeRow, error) {
+	row := q.db.QueryRow(ctx, getDocumentoByIDWithType, id)
+	var i GetDocumentoByIDWithTypeRow
+	err := row.Scan(
+		&i.ID,
+		&i.ProtocoloSagi,
+		&i.TipoDocumentoID,
+		&i.NomeArquivo,
+		&i.DriveFileID,
+		&i.DriveFileUrl,
+		&i.TamanhoBytes,
+		&i.MimeType,
+		&i.HashSha256,
+		&i.UploadedBy,
+		&i.UploadedAt,
+		&i.DeletedAt,
+		&i.DeletedBy,
+		&i.MotivoExclusao,
+		&i.Descricao,
+		&i.UploadedByName,
+		&i.GoogleDriveFolderID,
+		&i.TipoDocumentoNome,
 	)
 	return i, err
 }
 
 const listDocumentosByProtocolo = `-- name: ListDocumentosByProtocolo :many
-SELECT id, protocolo_sagi, tipo_documento_id, nome_arquivo, drive_file_id, drive_file_url, tamanho_bytes, mime_type, hash_sha256, uploaded_by, uploaded_at, deleted_at, deleted_by, motivo_exclusao FROM documentos
+SELECT id, protocolo_sagi, tipo_documento_id, nome_arquivo, drive_file_id, drive_file_url, tamanho_bytes, mime_type, hash_sha256, uploaded_by, uploaded_at, deleted_at, deleted_by, motivo_exclusao, descricao, uploaded_by_name, google_drive_folder_id FROM documentos
 WHERE protocolo_sagi = $1 AND deleted_at IS NULL
 ORDER BY uploaded_at DESC
 `
@@ -134,6 +218,82 @@ func (q *Queries) ListDocumentosByProtocolo(ctx context.Context, protocoloSagi s
 			&i.DeletedAt,
 			&i.DeletedBy,
 			&i.MotivoExclusao,
+			&i.Descricao,
+			&i.UploadedByName,
+			&i.GoogleDriveFolderID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDocumentosByProtocoloWithType = `-- name: ListDocumentosByProtocoloWithType :many
+SELECT
+    d.id, d.protocolo_sagi, d.tipo_documento_id, d.nome_arquivo,
+    d.drive_file_id, d.drive_file_url, d.tamanho_bytes, d.mime_type,
+    d.hash_sha256, d.uploaded_by, d.uploaded_at, d.deleted_at, d.deleted_by,
+    d.motivo_exclusao, d.descricao, d.uploaded_by_name, d.google_drive_folder_id,
+    COALESCE(td.nome, '') AS tipo_documento_nome
+FROM documentos d
+LEFT JOIN tipos_documento td ON td.id = d.tipo_documento_id
+WHERE d.protocolo_sagi = $1 AND d.deleted_at IS NULL
+ORDER BY d.uploaded_at DESC
+`
+
+type ListDocumentosByProtocoloWithTypeRow struct {
+	ID                  uuid.UUID        `json:"id"`
+	ProtocoloSagi       string           `json:"protocolo_sagi"`
+	TipoDocumentoID     pgtype.UUID      `json:"tipo_documento_id"`
+	NomeArquivo         string           `json:"nome_arquivo"`
+	DriveFileID         pgtype.Text      `json:"drive_file_id"`
+	DriveFileUrl        pgtype.Text      `json:"drive_file_url"`
+	TamanhoBytes        pgtype.Int8      `json:"tamanho_bytes"`
+	MimeType            pgtype.Text      `json:"mime_type"`
+	HashSha256          pgtype.Text      `json:"hash_sha256"`
+	UploadedBy          string           `json:"uploaded_by"`
+	UploadedAt          pgtype.Timestamp `json:"uploaded_at"`
+	DeletedAt           pgtype.Timestamp `json:"deleted_at"`
+	DeletedBy           pgtype.Text      `json:"deleted_by"`
+	MotivoExclusao      pgtype.Text      `json:"motivo_exclusao"`
+	Descricao           pgtype.Text      `json:"descricao"`
+	UploadedByName      pgtype.Text      `json:"uploaded_by_name"`
+	GoogleDriveFolderID pgtype.Text      `json:"google_drive_folder_id"`
+	TipoDocumentoNome   string           `json:"tipo_documento_nome"`
+}
+
+func (q *Queries) ListDocumentosByProtocoloWithType(ctx context.Context, protocoloSagi string) ([]ListDocumentosByProtocoloWithTypeRow, error) {
+	rows, err := q.db.Query(ctx, listDocumentosByProtocoloWithType, protocoloSagi)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListDocumentosByProtocoloWithTypeRow{}
+	for rows.Next() {
+		var i ListDocumentosByProtocoloWithTypeRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProtocoloSagi,
+			&i.TipoDocumentoID,
+			&i.NomeArquivo,
+			&i.DriveFileID,
+			&i.DriveFileUrl,
+			&i.TamanhoBytes,
+			&i.MimeType,
+			&i.HashSha256,
+			&i.UploadedBy,
+			&i.UploadedAt,
+			&i.DeletedAt,
+			&i.DeletedBy,
+			&i.MotivoExclusao,
+			&i.Descricao,
+			&i.UploadedByName,
+			&i.GoogleDriveFolderID,
+			&i.TipoDocumentoNome,
 		); err != nil {
 			return nil, err
 		}
@@ -159,5 +319,24 @@ type SoftDeleteDocumentoParams struct {
 
 func (q *Queries) SoftDeleteDocumento(ctx context.Context, arg SoftDeleteDocumentoParams) error {
 	_, err := q.db.Exec(ctx, softDeleteDocumento, arg.ID, arg.DeletedBy, arg.MotivoExclusao)
+	return err
+}
+
+const updateDocumentoMetadata = `-- name: UpdateDocumentoMetadata :exec
+UPDATE documentos
+SET
+    descricao = COALESCE($2, descricao),
+    tipo_documento_id = COALESCE($3, tipo_documento_id)
+WHERE id = $1 AND deleted_at IS NULL
+`
+
+type UpdateDocumentoMetadataParams struct {
+	ID              uuid.UUID   `json:"id"`
+	Descricao       pgtype.Text `json:"descricao"`
+	TipoDocumentoID pgtype.UUID `json:"tipo_documento_id"`
+}
+
+func (q *Queries) UpdateDocumentoMetadata(ctx context.Context, arg UpdateDocumentoMetadataParams) error {
+	_, err := q.db.Exec(ctx, updateDocumentoMetadata, arg.ID, arg.Descricao, arg.TipoDocumentoID)
 	return err
 }

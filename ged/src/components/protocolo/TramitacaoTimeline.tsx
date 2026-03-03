@@ -1,63 +1,43 @@
 'use client';
 
 import { useMemo } from 'react';
-import { format, formatDistanceToNow, differenceInDays, differenceInHours } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ArrowRight, Clock, MapPin, Route } from 'lucide-react';
+import { ArrowRight, Clock, MapPin, Route, BarChart3 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTramitacoes } from '@/hooks/use-observacoes';
 import type { TramitacaoSagi } from '@/lib/types';
+import { formatSectorName } from '@/lib/types';
 
-function formatPermanencia(fromDate: string, toDate: string | null): string {
-  const from = new Date(fromDate);
-  const to = toDate ? new Date(toDate) : new Date();
-
-  const days = differenceInDays(to, from);
-  const hours = differenceInHours(to, from) % 24;
-
-  if (days === 0) {
-    if (hours === 0) return 'Menos de 1 hora';
-    return `${hours}h`;
-  }
-  if (days === 1) return hours > 0 ? `1 dia e ${hours}h` : '1 dia';
-  return `${days} dias`;
+function formatPermanenciaDias(dias: number): string {
+  if (dias === 0) return 'Menos de 1 dia';
+  if (dias === 1) return '1 dia';
+  return `${dias} dias`;
 }
 
 interface TramitacaoTimelineProps {
-  protocoloSagi: string;
+  source: string;
+  id: number;
 }
 
 export function TramitacaoTimeline({
-  protocoloSagi,
+  source,
+  id,
 }: TramitacaoTimelineProps) {
-  const { data: tramitacoes, isLoading } = useTramitacoes(protocoloSagi);
+  const { data: response, isLoading } = useTramitacoes(source, id);
 
-  // Calcular permanência de cada tramitação
-  const items = useMemo(() => {
-    if (!tramitacoes || tramitacoes.length === 0) return [];
+  const tramitacoes = response?.data;
+  const resumo = response?.resumo;
 
-    return tramitacoes.map((tram, index) => {
-      const isLast = index === tramitacoes.length - 1;
-      const nextDate = isLast
-        ? null
-        : tramitacoes[index + 1].tramitadoEm;
-
-      return {
-        ...tram,
-        permanencia: formatPermanencia(tram.tramitadoEm, nextDate),
-        isLast,
-      };
-    });
-  }, [tramitacoes]);
-
-  // Setor atual = destino da última tramitação
+  // Setor atual = destino da tramitacao com reg_atual === true, ou ultima
   const setorAtual = useMemo(() => {
     if (!tramitacoes || tramitacoes.length === 0) return null;
-    const last = tramitacoes[tramitacoes.length - 1];
+    const atual = tramitacoes.find((t) => t.reg_atual);
+    const last = atual ?? tramitacoes[tramitacoes.length - 1];
     return {
-      nome: last.paraSetor,
-      desde: last.tramitadoEm,
+      nome: last.setor_destino,
+      desde: last.data_movimentacao,
     };
   }, [tramitacoes]);
 
@@ -94,7 +74,7 @@ export function TramitacaoTimeline({
 
   return (
     <div className="space-y-6">
-      {/* Resumo */}
+      {/* Resumo do setor atual */}
       {setorAtual && (
         <div className="flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
@@ -103,18 +83,42 @@ export function TramitacaoTimeline({
           <div>
             <p className="text-sm font-medium">
               Protocolo no setor{' '}
-              <span className="text-primary">{setorAtual.nome}</span>
+              <span className="text-primary">{formatSectorName(setorAtual.nome)}</span>
             </p>
-            <p className="text-xs text-muted-foreground">
-              Há{' '}
-              {formatDistanceToNow(new Date(setorAtual.desde), {
-                locale: ptBR,
-              })}{' '}
-              — desde{' '}
-              {format(new Date(setorAtual.desde), "dd/MM/yyyy 'às' HH:mm", {
-                locale: ptBR,
-              })}
-            </p>
+            {setorAtual.desde && (
+              <p className="text-xs text-muted-foreground">
+                Há{' '}
+                {formatDistanceToNow(new Date(setorAtual.desde), {
+                  locale: ptBR,
+                })}{' '}
+                — desde{' '}
+                {format(new Date(setorAtual.desde), "dd/MM/yyyy 'às' HH:mm", {
+                  locale: ptBR,
+                })}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Resumo estatistico */}
+      {resumo && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="rounded-lg border border-border/40 bg-card/50 p-3 text-center">
+            <p className="text-xs text-muted-foreground">Tempo total</p>
+            <p className="mt-1 text-sm font-semibold">{formatPermanenciaDias(resumo.tempo_total_dias)}</p>
+          </div>
+          <div className="rounded-lg border border-border/40 bg-card/50 p-3 text-center">
+            <p className="text-xs text-muted-foreground">Total setores</p>
+            <p className="mt-1 text-sm font-semibold">{resumo.total_setores}</p>
+          </div>
+          <div className="rounded-lg border border-border/40 bg-card/50 p-3 text-center">
+            <p className="text-xs text-muted-foreground">Setor mais longo</p>
+            <p className="mt-1 text-sm font-semibold truncate">{formatSectorName(resumo.setor_mais_longo)}</p>
+          </div>
+          <div className="rounded-lg border border-border/40 bg-card/50 p-3 text-center">
+            <p className="text-xs text-muted-foreground">Dias no setor</p>
+            <p className="mt-1 text-sm font-semibold">{resumo.dias_setor_mais_longo}</p>
           </div>
         </div>
       )}
@@ -125,74 +129,75 @@ export function TramitacaoTimeline({
         <div className="absolute left-[11px] top-2 bottom-2 w-px bg-border/60" />
 
         <div className="space-y-6">
-          {items.map((item) => (
-            <div key={item.id} className="relative">
-              {/* Nó do círculo */}
-              <div
-                className={`absolute -left-8 top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 ${
-                  item.isLast
-                    ? 'border-primary bg-primary/10'
-                    : 'border-border bg-background'
-                }`}
-              >
+          {tramitacoes.map((item, index) => {
+            const isLast = index === tramitacoes.length - 1;
+            const isCurrent = item.reg_atual;
+
+            return (
+              <div key={item.sequencia} className="relative">
+                {/* No do circulo */}
                 <div
-                  className={`h-2 w-2 rounded-full ${
-                    item.isLast ? 'bg-primary animate-pulse' : 'bg-muted-foreground/40'
+                  className={`absolute -left-8 top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 ${
+                    isCurrent
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border bg-background'
                   }`}
-                />
-              </div>
-
-              {/* Conteúdo */}
-              <div
-                className={`rounded-lg border p-3 ${
-                  item.isLast
-                    ? 'border-primary/30 bg-primary/5'
-                    : 'border-border/40'
-                }`}
-              >
-                {/* Setores */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="outline" className="text-xs">
-                    {item.deSetor}
-                  </Badge>
-                  <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
-                  <Badge
-                    variant={item.isLast ? 'default' : 'outline'}
-                    className="text-xs"
-                  >
-                    {item.paraSetor}
-                  </Badge>
+                >
+                  <div
+                    className={`h-2 w-2 rounded-full ${
+                      isCurrent ? 'bg-primary animate-pulse' : 'bg-muted-foreground/40'
+                    }`}
+                  />
                 </div>
 
-                {/* Despacho */}
-                {item.despacho && (
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    {item.despacho}
-                  </p>
-                )}
-
-                {/* Metadados */}
-                <div className="mt-2 flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
-                  <span>
-                    {format(
-                      new Date(item.tramitadoEm),
-                      "dd/MM/yyyy 'às' HH:mm",
-                      { locale: ptBR }
+                {/* Conteudo */}
+                <div
+                  className={`rounded-lg border p-3 ${
+                    isCurrent
+                      ? 'border-primary/30 bg-primary/5'
+                      : 'border-border/40'
+                  }`}
+                >
+                  {/* Setores */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="outline" className="text-xs">
+                      {formatSectorName(item.setor_origem)}
+                    </Badge>
+                    <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                    <Badge
+                      variant={isCurrent ? 'default' : 'outline'}
+                      className="text-xs"
+                    >
+                      {formatSectorName(item.setor_destino)}
+                    </Badge>
+                    {item.situacao && (
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                        {item.situacao}
+                      </Badge>
                     )}
-                  </span>
-                  <span>·</span>
-                  <span>{item.tramitadoPorNome}</span>
-                  <span>·</span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {item.isLast
-                      ? `Há ${formatPermanencia(item.tramitadoEm, null)} (atual)`
-                      : item.permanencia}
-                  </span>
+                  </div>
+
+                  {/* Metadados */}
+                  <div className="mt-2 flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
+                    {item.data_movimentacao && (
+                      <span>
+                        {format(
+                          new Date(item.data_movimentacao),
+                          "dd/MM/yyyy 'às' HH:mm",
+                          { locale: ptBR }
+                        )}
+                      </span>
+                    )}
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {formatPermanenciaDias(item.permanencia_dias)}
+                      {isCurrent && ' (atual)'}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

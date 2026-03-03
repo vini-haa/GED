@@ -9,24 +9,62 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countActivityLogs = `-- name: CountActivityLogs :one
+SELECT COUNT(*) FROM activity_logs
+WHERE
+    ($1::varchar IS NULL OR entidade = $1)
+    AND ($2::varchar IS NULL OR usuario_email = $2)
+    AND ($3::varchar IS NULL OR acao = $3)
+    AND ($4::timestamp IS NULL OR criado_em >= $4)
+    AND ($5::timestamp IS NULL OR criado_em <= $5)
+`
+
+type CountActivityLogsParams struct {
+	Entidade     pgtype.Text      `json:"entidade"`
+	UsuarioEmail pgtype.Text      `json:"usuario_email"`
+	Acao         pgtype.Text      `json:"acao"`
+	Desde        pgtype.Timestamp `json:"desde"`
+	Ate          pgtype.Timestamp `json:"ate"`
+}
+
+func (q *Queries) CountActivityLogs(ctx context.Context, arg CountActivityLogsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countActivityLogs,
+		arg.Entidade,
+		arg.UsuarioEmail,
+		arg.Acao,
+		arg.Desde,
+		arg.Ate,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createActivityLog = `-- name: CreateActivityLog :exec
 INSERT INTO activity_logs (
-    acao, entidade, entidade_id, detalhes,
-    usuario_email, usuario_nome, ip_address
-) VALUES ($1, $2, $3, $4, $5, $6, $7)
+    acao, entidade, entidade_id,
+    detalhes, usuario_email, usuario_nome,
+    ip_address, user_agent,
+    protocol_id, protocol_number, protocol_source
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 `
 
 type CreateActivityLogParams struct {
-	Acao         string          `json:"acao"`
-	Entidade     string          `json:"entidade"`
-	EntidadeID   pgtype.Text     `json:"entidade_id"`
-	Detalhes     json.RawMessage `json:"detalhes"`
-	UsuarioEmail string          `json:"usuario_email"`
-	UsuarioNome  string          `json:"usuario_nome"`
-	IpAddress    pgtype.Text     `json:"ip_address"`
+	Acao           string          `json:"acao"`
+	Entidade       string          `json:"entidade"`
+	EntidadeID     pgtype.Text     `json:"entidade_id"`
+	Detalhes       json.RawMessage `json:"detalhes"`
+	UsuarioEmail   string          `json:"usuario_email"`
+	UsuarioNome    string          `json:"usuario_nome"`
+	IpAddress      pgtype.Text     `json:"ip_address"`
+	UserAgent      pgtype.Text     `json:"user_agent"`
+	ProtocolID     pgtype.Int4     `json:"protocol_id"`
+	ProtocolNumber pgtype.Text     `json:"protocol_number"`
+	ProtocolSource pgtype.Text     `json:"protocol_source"`
 }
 
 func (q *Queries) CreateActivityLog(ctx context.Context, arg CreateActivityLogParams) error {
@@ -38,17 +76,48 @@ func (q *Queries) CreateActivityLog(ctx context.Context, arg CreateActivityLogPa
 		arg.UsuarioEmail,
 		arg.UsuarioNome,
 		arg.IpAddress,
+		arg.UserAgent,
+		arg.ProtocolID,
+		arg.ProtocolNumber,
+		arg.ProtocolSource,
 	)
 	return err
 }
 
+const getActivityLogByID = `-- name: GetActivityLogByID :one
+SELECT id, acao, entidade, entidade_id, detalhes, usuario_email, usuario_nome, ip_address, criado_em, user_agent, protocol_id, protocol_number, protocol_source FROM activity_logs
+WHERE id = $1
+`
+
+func (q *Queries) GetActivityLogByID(ctx context.Context, id uuid.UUID) (ActivityLog, error) {
+	row := q.db.QueryRow(ctx, getActivityLogByID, id)
+	var i ActivityLog
+	err := row.Scan(
+		&i.ID,
+		&i.Acao,
+		&i.Entidade,
+		&i.EntidadeID,
+		&i.Detalhes,
+		&i.UsuarioEmail,
+		&i.UsuarioNome,
+		&i.IpAddress,
+		&i.CriadoEm,
+		&i.UserAgent,
+		&i.ProtocolID,
+		&i.ProtocolNumber,
+		&i.ProtocolSource,
+	)
+	return i, err
+}
+
 const listActivityLogs = `-- name: ListActivityLogs :many
-SELECT id, acao, entidade, entidade_id, detalhes, usuario_email, usuario_nome, ip_address, criado_em FROM activity_logs
+SELECT id, acao, entidade, entidade_id, detalhes, usuario_email, usuario_nome, ip_address, criado_em, user_agent, protocol_id, protocol_number, protocol_source FROM activity_logs
 WHERE
     ($3::varchar IS NULL OR entidade = $3)
     AND ($4::varchar IS NULL OR usuario_email = $4)
-    AND ($5::timestamp IS NULL OR criado_em >= $5)
-    AND ($6::timestamp IS NULL OR criado_em <= $6)
+    AND ($5::varchar IS NULL OR acao = $5)
+    AND ($6::timestamp IS NULL OR criado_em >= $6)
+    AND ($7::timestamp IS NULL OR criado_em <= $7)
 ORDER BY criado_em DESC
 LIMIT $1 OFFSET $2
 `
@@ -58,6 +127,7 @@ type ListActivityLogsParams struct {
 	Offset       int32            `json:"offset"`
 	Entidade     pgtype.Text      `json:"entidade"`
 	UsuarioEmail pgtype.Text      `json:"usuario_email"`
+	Acao         pgtype.Text      `json:"acao"`
 	Desde        pgtype.Timestamp `json:"desde"`
 	Ate          pgtype.Timestamp `json:"ate"`
 }
@@ -68,6 +138,7 @@ func (q *Queries) ListActivityLogs(ctx context.Context, arg ListActivityLogsPara
 		arg.Offset,
 		arg.Entidade,
 		arg.UsuarioEmail,
+		arg.Acao,
 		arg.Desde,
 		arg.Ate,
 	)
@@ -88,6 +159,10 @@ func (q *Queries) ListActivityLogs(ctx context.Context, arg ListActivityLogsPara
 			&i.UsuarioNome,
 			&i.IpAddress,
 			&i.CriadoEm,
+			&i.UserAgent,
+			&i.ProtocolID,
+			&i.ProtocolNumber,
+			&i.ProtocolSource,
 		); err != nil {
 			return nil, err
 		}

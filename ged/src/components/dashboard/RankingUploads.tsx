@@ -40,7 +40,24 @@ export function RankingUploads({ data, isLoading }: RankingUploadsProps) {
     );
   }
 
-  if (!data || data.length === 0) return null;
+  if (!data || data.length === 0) {
+    return (
+      <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+        <div className="flex items-center gap-2">
+          <Upload className="h-4 w-4 text-muted-foreground" />
+          <h3 className="text-sm font-medium">Top Uploaders</h3>
+        </div>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Ranking por quantidade de uploads
+        </p>
+        <div className="mt-4 flex h-[160px] items-center justify-center">
+          <p className="text-sm text-muted-foreground">
+            Nenhum upload registrado no período
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const maxUploads = data[0].uploads;
 
