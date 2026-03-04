@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/tabs';
 import { Pagination } from '@/components/shared/Pagination';
 import { useProtocolos } from '@/hooks/use-protocolos';
+import { useProtocolosInternos } from '@/hooks/use-protocolos-internos';
 import type { ProtocolFilters, ProtocolTab } from '@/lib/types';
 import {
   Building2,
@@ -52,14 +53,32 @@ export function ProtocoloTabs() {
     'meu_setor'
   );
 
+  const isInternos = filters.tab === 'internos';
+
+  // Hook para protocolos SAGI
   const { data: result, isLoading } = useProtocolos(filters);
+
+  // Hook para protocolos internos com filtros
+  const internosParams = isInternos
+    ? {
+        page: filters.page,
+        per_page: PER_PAGE,
+        setor: filters.setor !== 'all' ? (filters.setor as number) : undefined,
+        status: filters.status !== 'all' ? filters.status : undefined,
+        search: filters.busca || undefined,
+        projeto: filters.projeto || undefined,
+      }
+    : undefined;
+  const { data: internosResult, isLoading: internosLoading } = useProtocolosInternos(
+    internosParams,
+    isInternos
+  );
 
   const updateFilters = useCallback(
     (partial: Partial<ProtocolFilters>) => {
       setFilters((prev) => ({
         ...prev,
         ...partial,
-        // Reseta pagina ao mudar qualquer filtro (exceto page)
         page: 'page' in partial ? (partial.page ?? 1) : 1,
       }));
     },
@@ -150,6 +169,20 @@ export function ProtocoloTabs() {
     filters.periodo !== 'all' ||
     !!filters.projeto;
 
+  // Paginação: usar resultado correto conforme a aba
+  const paginationData = isInternos
+    ? internosResult
+      ? {
+          page: internosResult.page,
+          total_pages: internosResult.total_pages,
+          total: internosResult.total,
+          page_size: internosResult.per_page,
+        }
+      : null
+    : result
+      ? result.pagination
+      : null;
+
   return (
     <div className="space-y-4">
       <Tabs value={filters.tab} onValueChange={handleTabChange}>
@@ -166,33 +199,37 @@ export function ProtocoloTabs() {
           ))}
         </TabsList>
 
-        {filters.tab !== 'internos' && (
-          <div className="mt-4 space-y-3">
-            <ProtocoloSearchBar
-              value={filters.busca}
-              onSearch={handleSearch}
-              scope={searchScope}
-              onScopeChange={handleScopeChange}
-            />
+        <div className="mt-4 space-y-3">
+          <ProtocoloSearchBar
+            value={filters.busca}
+            onSearch={handleSearch}
+            scope={searchScope}
+            onScopeChange={isInternos ? undefined : handleScopeChange}
+          />
 
-            <ProtocoloFilters
-              status={filters.status}
-              setor={filters.setor}
-              periodo={filters.periodo}
-              ordenacao={filters.ordenacao}
-              onStatusChange={handleStatusChange}
-              onSetorChange={handleSetorChange}
-              onPeriodoChange={handlePeriodoChange}
-              onOrdenacaoChange={handleOrdenacaoChange}
-              projeto={filters.projeto}
-              onProjetoChange={handleProjetoChange}
-              onClear={handleClearFilters}
-            />
-          </div>
-        )}
+          <ProtocoloFilters
+            status={filters.status}
+            setor={filters.setor}
+            periodo={filters.periodo}
+            ordenacao={filters.ordenacao}
+            projeto={filters.projeto}
+            onStatusChange={handleStatusChange}
+            onSetorChange={handleSetorChange}
+            onPeriodoChange={handlePeriodoChange}
+            onOrdenacaoChange={isInternos ? undefined : handleOrdenacaoChange}
+            onProjetoChange={handleProjetoChange}
+            onClear={handleClearFilters}
+            isInternos={isInternos}
+            hideSetor={filters.tab === 'meu_setor'}
+          />
+        </div>
 
         <TabsContent value="internos" className="mt-4">
-          <ProtocoloInternoTable />
+          <ProtocoloInternoTable
+            data={internosResult?.data ?? []}
+            isLoading={internosLoading}
+            hasFilters={hasFilters}
+          />
         </TabsContent>
 
         {tabs
@@ -209,12 +246,12 @@ export function ProtocoloTabs() {
           ))}
       </Tabs>
 
-      {result && result.pagination.total_pages > 1 && (
+      {paginationData && paginationData.total_pages > 1 && (
         <Pagination
-          page={result.pagination.page}
-          totalPages={result.pagination.total_pages}
-          total={result.pagination.total}
-          perPage={result.pagination.page_size}
+          page={paginationData.page}
+          totalPages={paginationData.total_pages}
+          total={paginationData.total}
+          perPage={paginationData.page_size}
           onPageChange={handlePageChange}
         />
       )}

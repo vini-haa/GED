@@ -128,26 +128,106 @@ func (s *DashboardService) KPIs(ctx context.Context, q dto.DashboardQuery) ([]dt
 	return kpis, nil
 }
 
-// UploadsPorPeriodo retorna os dados para o gráfico de linha.
+// UploadsPorPeriodo retorna os dados para o gráfico de linha (uploads + protocolos criados por dia).
 func (s *DashboardService) UploadsPorPeriodo(ctx context.Context, q dto.DashboardQuery) ([]dto.UploadsPeriodoItem, error) {
 	dataInicio := q.DataInicio()
 	ts := pgtype.Timestamp{Time: dataInicio, Valid: true}
 
-	rows, err := s.queries.DashboardUploadsPorPeriodo(ctx, ts)
+	// Mapa dia -> item agregado
+	dayMap := make(map[string]*dto.UploadsPeriodoItem)
+
+	// 1. Uploads de documentos (PostgreSQL)
+	uploadRows, err := s.queries.DashboardUploadsPorDia(ctx, ts)
 	if err != nil {
-		return nil, fmt.Errorf("erro ao buscar uploads por período: %w", err)
+		log.Error().Err(err).Msg("dashboard: erro ao buscar uploads por dia")
+	} else {
+		for _, r := range uploadRows {
+			if _, ok := dayMap[r.Data]; !ok {
+				dayMap[r.Data] = &dto.UploadsPeriodoItem{Data: r.Data}
+			}
+			dayMap[r.Data].Uploads = r.Total
+		}
 	}
 
-	items := make([]dto.UploadsPeriodoItem, len(rows))
-	for i, r := range rows {
-		items[i] = dto.UploadsPeriodoItem{
-			Data:       r.Data,
-			Uploads:    r.Uploads,
-			Protocolos: r.Protocolos,
+	// 2. Protocolos internos criados (PostgreSQL)
+	tstz := pgtype.Timestamptz{Time: dataInicio, Valid: true}
+	internosRows, err := s.queries.DashboardProtocolosInternosPorDia(ctx, tstz)
+	if err != nil {
+		log.Error().Err(err).Msg("dashboard: erro ao buscar protocolos internos por dia")
+	} else {
+		for _, r := range internosRows {
+			if _, ok := dayMap[r.Data]; !ok {
+				dayMap[r.Data] = &dto.UploadsPeriodoItem{Data: r.Data}
+			}
+			dayMap[r.Data].ProtocolosInternos = r.Total
+		}
+	}
+
+	// 3. Protocolos SAGI criados (SQL Server)
+	if s.sagiDB != nil {
+		sagiRows, err := s.protocolosSAGIPorDia(ctx, dataInicio)
+		if err != nil {
+			log.Error().Err(err).Msg("dashboard: erro ao buscar protocolos SAGI por dia")
+		} else {
+			for _, r := range sagiRows {
+				if _, ok := dayMap[r.data]; !ok {
+					dayMap[r.data] = &dto.UploadsPeriodoItem{Data: r.data}
+				}
+				dayMap[r.data].ProtocolosExternos = r.total
+			}
+		}
+	}
+
+	// Gerar série completa de dias (preencher dias sem dados com zeros)
+	dias := q.PeriodoDays()
+	items := make([]dto.UploadsPeriodoItem, 0, dias)
+	for i := dias - 1; i >= 0; i-- {
+		d := time.Now().AddDate(0, 0, -i).Format("2006-01-02")
+		if entry, ok := dayMap[d]; ok {
+			items = append(items, *entry)
+		} else {
+			items = append(items, dto.UploadsPeriodoItem{Data: d})
 		}
 	}
 
 	return items, nil
+}
+
+type sagiDayCount struct {
+	data  string
+	total int64
+}
+
+// protocolosSAGIPorDia busca quantidade de protocolos SAGI criados por dia.
+func (s *DashboardService) protocolosSAGIPorDia(ctx context.Context, desde time.Time) ([]sagiDayCount, error) {
+	ctx2, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	query := `
+SELECT
+    CONVERT(VARCHAR(10), d.data, 120) AS dia,
+    COUNT(*) AS total
+FROM documento d
+WHERE (d.deletado IS NULL OR d.deletado = 0)
+  AND d.data >= @pDesde
+GROUP BY CONVERT(VARCHAR(10), d.data, 120)
+ORDER BY dia`
+
+	rows, err := s.sagiDB.QueryContext(ctx2, query, sql.Named("pDesde", desde))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []sagiDayCount
+	for rows.Next() {
+		var item sagiDayCount
+		if err := rows.Scan(&item.data, &item.total); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
 }
 
 // DocsPorTipo retorna os dados para o gráfico de pizza.

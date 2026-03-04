@@ -107,6 +107,12 @@ func main() {
 		setorRepo = repository.NewSAGISetorRepository(sagi)
 	}
 
+	// Projetos SAGI (com cache)
+	var projetoRepo *repository.SAGIProjetoRepository
+	if sagi != nil {
+		projetoRepo = repository.NewSAGIProjetoRepository(sagi)
+	}
+
 	// Protocolos Internos
 	internalProtocolService := service.NewInternalProtocolService(pg, queries, setorRepo, activityLogService)
 
@@ -132,6 +138,7 @@ func main() {
 	tramitacaoHandler := handler.NewTramitacaoHandler(tramitacaoService)
 	intProtoHandler := handler.NewProtocoloInternoHandler(internalProtocolService)
 
+	projetoHandler := handler.NewProjetoHandler(projetoRepo)
 	dashboardHandler := handler.NewDashboardHandler(dashboardService)
 	dashboardExportHandler := handler.NewDashboardExportHandler(dashboardService, activityLogService)
 	downloadHandler := handler.NewDownloadHandler(downloadService)
@@ -161,6 +168,9 @@ func main() {
 
 	// Setores
 	auth.GET("/setores", intProtoHandler.ListSetores)
+
+	// Projetos SAGI
+	auth.GET("/projetos", projetoHandler.Search)
 
 	// Dashboard
 	auth.GET("/dashboard/kpis", dashboardHandler.KPIs)

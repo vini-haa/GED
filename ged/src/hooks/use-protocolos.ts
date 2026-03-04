@@ -65,10 +65,11 @@ export function useProtocolos(filters: ProtocolFilters) {
 }
 
 export function useProtocoloCounters(setor: number | null) {
+  // setor=0 para admin sem setor (retorna contadores globais)
+  const setorParam = setor ?? 0;
   return useQuery({
-    queryKey: ['protocolo-counters', setor],
-    queryFn: () => fetchProtocoloCounters(setor!),
-    enabled: setor !== null,
+    queryKey: ['protocolo-counters', setorParam],
+    queryFn: () => fetchProtocoloCounters(setorParam),
   });
 }
 
@@ -84,5 +85,33 @@ export function useRecentes(limit: number = 10) {
   return useQuery({
     queryKey: ['recentes', limit],
     queryFn: () => fetchRecentes(limit),
+  });
+}
+
+// ============================================
+// Projetos SAGI
+// ============================================
+
+export interface ProjetoSAGI {
+  numconv: number;
+  titulo: string;
+  num_oficial: string;
+}
+
+async function fetchProjetos(search: string): Promise<ProjetoSAGI[]> {
+  const params = new URLSearchParams();
+  if (search) params.set('search', search);
+  const query = params.toString();
+  const resp = await apiClient.get<{ data: ProjetoSAGI[] }>(
+    `/projetos${query ? `?${query}` : ''}`
+  );
+  return resp.data;
+}
+
+export function useProjetos(search: string) {
+  return useQuery({
+    queryKey: ['projetos', search],
+    queryFn: () => fetchProjetos(search),
+    staleTime: 10 * 60 * 1000,
   });
 }

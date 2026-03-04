@@ -4,19 +4,14 @@ import { useCallback, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
 import { z } from 'zod';
-import { Loader2, Send } from 'lucide-react';
+import { Building2, Loader2, Send } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { DocumentoUploadZone } from './DocumentoUploadZone';
+import { ProjetoCombobox } from './ProjetoCombobox';
 import { useCreateProtocoloInterno } from '@/hooks/use-protocolos-internos';
 import { useUploadDocumento } from '@/hooks/use-documentos';
 import { useCurrentUser } from '@/hooks/use-user-sector';
@@ -29,19 +24,6 @@ const schema = z.object({
     .string()
     .min(5, 'Assunto deve ter pelo menos 5 caracteres')
     .max(200, 'Assunto deve ter no maximo 200 caracteres'),
-  interested: z
-    .string()
-    .min(1, 'Interessado e obrigatorio')
-    .max(200, 'Interessado deve ter no maximo 200 caracteres'),
-  sender: z
-    .string()
-    .min(1, 'Remetente e obrigatorio')
-    .max(200, 'Remetente deve ter no maximo 200 caracteres'),
-  project_name: z
-    .string()
-    .max(200, 'Nome do projeto deve ter no maximo 200 caracteres')
-    .optional()
-    .transform((v) => (v && v.trim().length > 0 ? v.trim() : '')),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -55,9 +37,14 @@ export function CriarProtocoloForm() {
 
   const [files, setFiles] = useState<UploadFileItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [selectedSetor, setSelectedSetor] = useState<string>('');
+  const [projectName, setProjectName] = useState('');
+  const [observations, setObservations] = useState('');
 
-  const userHasSetor = !!currentUser?.setor;
+  // Resolver nome do setor do usuário
+  const userSetorCode = currentUser?.setor ? Number(currentUser.setor) : null;
+  const userSetorName = userSetorCode
+    ? setores.find((s) => s.codigo === userSetorCode)?.descricao ?? `Setor ${userSetorCode}`
+    : null;
 
   const {
     register,
@@ -66,9 +53,6 @@ export function CriarProtocoloForm() {
   } = useForm<FormValues>({
     defaultValues: {
       subject: '',
-      interested: '',
-      sender: '',
-      project_name: '',
     },
   });
 
@@ -77,10 +61,10 @@ export function CriarProtocoloForm() {
       const parsed = schema.safeParse(data);
       if (!parsed.success) return;
 
-      if (!userHasSetor && !selectedSetor) {
+      if (!userSetorCode) {
         toast({
-          title: 'Setor obrigatorio',
-          description: 'Selecione o setor de origem do protocolo.',
+          title: 'Setor nao identificado',
+          description: 'Seu usuario nao possui setor vinculado. Contate o administrador.',
           variant: 'destructive',
         });
         return;
@@ -89,26 +73,26 @@ export function CriarProtocoloForm() {
       setSubmitting(true);
 
       try {
-        // 1. Criar o protocolo
-        let sectorCode: number | undefined;
-        if (currentUser?.setor) {
-          sectorCode = Number(currentUser.setor);
-        } else if (selectedSetor) {
-          sectorCode = Number(selectedSetor);
-        }
-        if (sectorCode && isNaN(sectorCode)) sectorCode = undefined;
-
         const protocolo = await createMutation.mutateAsync({
           subject: parsed.data.subject,
-          interested: parsed.data.interested,
-          sender: parsed.data.sender,
-          project_name: parsed.data.project_name ?? '',
-          sector_code: sectorCode,
+          project_name: projectName,
+          observations,
+          sector_code: userSetorCode,
         });
 
-        // 2. Upload dos arquivos selecionados (se houver)
+        // Upload dos arquivos selecionados (se houver)
         const validFiles = files.filter((f) => f.status === 'queued');
         if (validFiles.length > 0) {
+          const withoutType = validFiles.filter((f) => !f.tipoDocumentoId);
+          if (withoutType.length > 0) {
+            toast({
+              title: 'Tipo obrigatorio',
+              description: `Selecione o tipo de documento para ${withoutType.length === 1 ? 'o arquivo' : 'todos os arquivos'} antes de enviar.`,
+              variant: 'destructive',
+            });
+            setSubmitting(false);
+            return;
+          }
           let successCount = 0;
           let errorCount = 0;
 
@@ -164,7 +148,7 @@ export function CriarProtocoloForm() {
         setSubmitting(false);
       }
     },
-    [createMutation, uploadMutation, files, router, currentUser, userHasSetor, selectedSetor]
+    [createMutation, uploadMutation, files, router, userSetorCode, projectName, observations]
   );
 
   const isPending = submitting || createMutation.isPending;
@@ -186,76 +170,48 @@ export function CriarProtocoloForm() {
         )}
       </div>
 
-      {/* Interessado */}
+      {/* Projeto (Combobox com busca) */}
       <div className="space-y-2">
-        <Label htmlFor="interested">
-          Interessado <span className="text-destructive">*</span>
-        </Label>
-        <Input
-          id="interested"
-          placeholder="Nome do interessado..."
-          {...register('interested')}
+        <Label>Projeto</Label>
+        <ProjetoCombobox
+          value={projectName}
+          onChange={setProjectName}
+          disabled={isPending}
         />
-        {errors.interested && (
-          <p className="text-sm text-destructive">
-            {errors.interested.message}
-          </p>
-        )}
+        <p className="text-xs text-muted-foreground">
+          Comece a digitar para buscar projetos cadastrados.
+        </p>
       </div>
 
-      {/* Remetente */}
+      {/* Observações */}
       <div className="space-y-2">
-        <Label htmlFor="sender">
-          Remetente <span className="text-destructive">*</span>
-        </Label>
-        <Input
-          id="sender"
-          placeholder="Nome do remetente..."
-          {...register('sender')}
+        <Label htmlFor="observations">Observações</Label>
+        <Textarea
+          id="observations"
+          placeholder="Informações adicionais, detalhes relevantes..."
+          value={observations}
+          onChange={(e) => setObservations(e.target.value)}
+          disabled={isPending}
+          rows={4}
+          maxLength={5000}
+          className="resize-y"
         />
-        {errors.sender && (
-          <p className="text-sm text-destructive">{errors.sender.message}</p>
-        )}
+        <p className="text-xs text-muted-foreground">
+          Campo pesquisável — use para registrar informações que ajudem a localizar este protocolo.
+        </p>
       </div>
 
-      {/* Nome do Projeto */}
+      {/* Setor (read-only, preenchido automaticamente) */}
       <div className="space-y-2">
-        <Label htmlFor="project_name">Nome do Projeto</Label>
-        <Input
-          id="project_name"
-          placeholder="Nome do projeto relacionado (opcional)..."
-          {...register('project_name')}
-        />
-        {errors.project_name && (
-          <p className="text-sm text-destructive">
-            {errors.project_name.message}
-          </p>
-        )}
-      </div>
-
-      {/* Setor (apenas quando o usuario nao tem setor definido) */}
-      {!userHasSetor && (
-        <div className="space-y-2">
-          <Label htmlFor="sector">
-            Setor <span className="text-destructive">*</span>
-          </Label>
-          <Select value={selectedSetor} onValueChange={setSelectedSetor}>
-            <SelectTrigger id="sector">
-              <SelectValue placeholder="Selecione o setor..." />
-            </SelectTrigger>
-            <SelectContent>
-              {setores.map((s) => (
-                <SelectItem key={s.codigo} value={String(s.codigo)}>
-                  {s.descricao}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">
-            Seu usuario nao possui setor vinculado. Selecione o setor de origem do protocolo.
-          </p>
+        <Label>Setor</Label>
+        <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-muted/30 px-3 py-2 text-sm">
+          <Building2 className="h-4 w-4 text-muted-foreground" />
+          <span>{userSetorName ?? 'Carregando...'}</span>
         </div>
-      )}
+        <p className="text-xs text-muted-foreground">
+          O protocolo sera criado no setor do seu usuario.
+        </p>
+      </div>
 
       {/* Upload de documentos */}
       <div className="space-y-2">
@@ -280,7 +236,7 @@ export function CriarProtocoloForm() {
         >
           Cancelar
         </Button>
-        <Button type="submit" disabled={isPending}>
+        <Button type="submit" disabled={isPending || !userSetorCode}>
           {isPending ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (

@@ -18,11 +18,13 @@ import type {
 // Funções de fetch — chamadas à API Go real
 // ============================================
 
-interface ListInternalParams {
+export interface ListInternalParams {
   page?: number;
   per_page?: number;
   setor?: number;
   status?: string;
+  search?: string;
+  projeto?: string;
 }
 
 async function fetchProtocolosInternos(
@@ -33,6 +35,8 @@ async function fetchProtocolosInternos(
   if (params?.per_page) qs.set('per_page', String(params.per_page));
   if (params?.setor) qs.set('setor', String(params.setor));
   if (params?.status) qs.set('status', params.status);
+  if (params?.search) qs.set('search', params.search);
+  if (params?.projeto) qs.set('projeto', params.projeto);
 
   const query = qs.toString();
   return apiClient.get<ListInternalProtocolsResponse>(
@@ -108,10 +112,11 @@ async function deleteProtocoloInterno(params: {
 // Hooks exportados
 // ============================================
 
-export function useProtocolosInternos(params?: ListInternalParams) {
+export function useProtocolosInternos(params?: ListInternalParams, enabled = true) {
   return useQuery({
     queryKey: ['protocolos-internos', params],
     queryFn: () => fetchProtocolosInternos(params),
+    enabled,
   });
 }
 

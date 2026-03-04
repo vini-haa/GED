@@ -9,15 +9,24 @@ SELECT COUNT(*) FROM observacoes
 WHERE deleted_at IS NULL
   AND ($1::timestamp IS NULL OR criado_em >= $1);
 
--- name: DashboardUploadsPorPeriodo :many
+-- name: DashboardUploadsPorDia :many
 SELECT
     TO_CHAR(uploaded_at, 'YYYY-MM-DD') AS data,
-    COUNT(*) AS uploads,
-    COUNT(DISTINCT protocolo_sagi) AS protocolos
+    COUNT(*) AS total
 FROM documentos
 WHERE deleted_at IS NULL
   AND uploaded_at >= $1
 GROUP BY TO_CHAR(uploaded_at, 'YYYY-MM-DD')
+ORDER BY data;
+
+-- name: DashboardProtocolosInternosPorDia :many
+SELECT
+    TO_CHAR(created_at, 'YYYY-MM-DD') AS data,
+    COUNT(*) AS total
+FROM internal_protocols
+WHERE is_deleted = FALSE
+  AND created_at >= $1
+GROUP BY TO_CHAR(created_at, 'YYYY-MM-DD')
 ORDER BY data;
 
 -- name: DashboardDocsPorTipo :many

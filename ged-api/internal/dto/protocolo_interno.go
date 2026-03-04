@@ -6,19 +6,21 @@ import "time"
 
 // CreateInternalProtocolRequest é o body JSON para criar um protocolo interno.
 type CreateInternalProtocolRequest struct {
-	Subject     string `json:"subject" binding:"required,max=500"`
-	Interested  string `json:"interested" binding:"required,max=200"`
-	Sender      string `json:"sender" binding:"required,max=200"`
-	ProjectName string `json:"project_name" binding:"max=300"`
-	SectorCode  *int   `json:"sector_code,omitempty"`
+	Subject      string `json:"subject" binding:"required,max=500"`
+	Interested   string `json:"interested" binding:"max=200"`
+	Sender       string `json:"sender" binding:"max=200"`
+	ProjectName  string `json:"project_name" binding:"max=300"`
+	Observations string `json:"observations" binding:"max=5000"`
+	SectorCode   *int   `json:"sector_code,omitempty"`
 }
 
 // UpdateInternalProtocolRequest é o body JSON para editar um protocolo interno.
 type UpdateInternalProtocolRequest struct {
-	Subject     *string `json:"subject"`
-	Interested  *string `json:"interested"`
-	Sender      *string `json:"sender"`
-	ProjectName *string `json:"project_name"`
+	Subject      *string `json:"subject"`
+	Interested   *string `json:"interested"`
+	Sender       *string `json:"sender"`
+	ProjectName  *string `json:"project_name"`
+	Observations *string `json:"observations"`
 }
 
 // ChangeStatusRequest é o body JSON para alterar o status de um protocolo interno.
@@ -44,6 +46,8 @@ type ListInternalProtocolsQuery struct {
 	PerPage int    `form:"per_page"`
 	Setor   *int   `form:"setor"`
 	Status  string `form:"status"`
+	Search  string `form:"search"`
+	Projeto string `form:"projeto"`
 }
 
 // Defaults aplica valores padrão.
@@ -74,6 +78,7 @@ type InternalProtocolItem struct {
 	Interested        string     `json:"interested"`
 	Sender            string     `json:"sender"`
 	ProjectName       string     `json:"project_name"`
+	Observations      string     `json:"observations"`
 	CurrentSectorName string     `json:"current_sector_name"`
 	CurrentSectorCode int32      `json:"current_sector_code"`
 	Status            string     `json:"status"`
@@ -92,6 +97,7 @@ type InternalProtocolDetail struct {
 	Interested        string     `json:"interested"`
 	Sender            string     `json:"sender"`
 	ProjectName       string     `json:"project_name"`
+	Observations      string     `json:"observations"`
 	CurrentSectorName string     `json:"current_sector_name"`
 	CurrentSectorCode int32      `json:"current_sector_code"`
 	Status            string     `json:"status"`

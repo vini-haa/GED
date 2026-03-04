@@ -434,6 +434,28 @@ WHERE (d.deletado IS NULL OR d.deletado = 0)
 	return nums, rows.Err()
 }
 
+// CountProtocolosGlobal retorna total de protocolos ativos (sem filtro de setor).
+func (r *SAGIProtocoloRepository) CountProtocolosGlobal(ctx context.Context) (int64, error) {
+	ctx, cancel := context.WithTimeout(ctx, sagiQueryTimeout)
+	defer cancel()
+
+	query := `
+SELECT COUNT(*)
+FROM documento d
+WHERE (d.deletado IS NULL OR d.deletado = 0)`
+
+	start := time.Now()
+	var count int64
+	err := r.db.QueryRowContext(ctx, query).Scan(&count)
+	dur := time.Since(start)
+	logSlowQuery("CountProtocolosGlobal", dur, 0)
+
+	if err != nil {
+		return 0, fmt.Errorf("erro ao contar protocolos globais: %w", err)
+	}
+	return count, nil
+}
+
 // GetProtocoloByID busca um protocolo SAGI pelo Codigo (ID inteiro).
 func (r *SAGIProtocoloRepository) GetProtocoloByID(ctx context.Context, id int) (ProtocoloDocumento, error) {
 	ctx, cancel := context.WithTimeout(ctx, sagiQueryTimeout)

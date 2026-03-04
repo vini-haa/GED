@@ -20,8 +20,7 @@ import {
 } from '@/components/ui/table';
 import type { Protocol, ProtocolTab } from '@/lib/types';
 import { formatSectorName } from '@/lib/types';
-import { formatDistanceToNow } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { formatDateTime } from '@/lib/date-utils';
 import {
   AlertTriangle,
   Eye,
@@ -118,7 +117,7 @@ export function ProtocoloTable({
               Projeto
             </TableHead>
             <TableHead className="hidden md:table-cell">
-              Setor Destino
+              Setor Atual
             </TableHead>
             <TableHead className="text-center">Status</TableHead>
             <TableHead className="hidden sm:table-cell text-center">
@@ -178,15 +177,7 @@ export function ProtocoloTable({
                 </span>
               </TableCell>
               <TableCell className="hidden sm:table-cell text-muted-foreground">
-                {protocol.data_chegada_setor
-                  ? formatDistanceToNow(
-                      new Date(protocol.data_chegada_setor),
-                      {
-                        addSuffix: true,
-                        locale: ptBR,
-                      }
-                    )
-                  : '—'}
+                {formatDateTime(protocol.data_chegada_setor)}
               </TableCell>
               <TableCell>
                 <DropdownMenu>

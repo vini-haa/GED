@@ -58,6 +58,34 @@ func (q *Queries) CountDocsByProtocoloIDsForSetor(ctx context.Context, dollar_1 
 	return count, err
 }
 
+const countDocsGlobal = `-- name: CountDocsGlobal :one
+SELECT COUNT(*)
+FROM documentos
+WHERE deleted_at IS NULL
+`
+
+func (q *Queries) CountDocsGlobal(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countDocsGlobal)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countProtocolosComDocsGlobal = `-- name: CountProtocolosComDocsGlobal :one
+SELECT COUNT(DISTINCT protocolo_sagi)
+FROM documentos
+WHERE deleted_at IS NULL
+  AND protocolo_sagi IS NOT NULL
+  AND protocolo_sagi != ''
+`
+
+func (q *Queries) CountProtocolosComDocsGlobal(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countProtocolosComDocsGlobal)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countProtocolosInternos = `-- name: CountProtocolosInternos :one
 SELECT COUNT(*)
 FROM protocolos_internos

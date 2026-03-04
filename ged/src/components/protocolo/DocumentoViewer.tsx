@@ -1,8 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { formatDateTime } from '@/lib/date-utils';
 import {
   FileText,
   Image,
@@ -128,13 +127,7 @@ export function DocumentoViewer({
   if (!documento) return null;
 
   const Icon = getMimeIcon(documento.mime_type);
-  const dataUpload = documento.uploaded_at
-    ? format(
-        new Date(documento.uploaded_at),
-        "dd/MM/yyyy 'às' HH:mm",
-        { locale: ptBR }
-      )
-    : '—';
+  const dataUpload = formatDateTime(documento.uploaded_at);
 
   function handleDownload() {
     if (!documento) return;

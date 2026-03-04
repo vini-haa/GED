@@ -48,9 +48,27 @@ func (s *ObservacaoService) List(ctx context.Context, protocolID int, source, us
 		recentCount = 0
 	}
 
+	// Coletar IDs para buscar reply_count
+	obsIDs := make([]uuid.UUID, len(obs))
+	for i, o := range obs {
+		obsIDs[i] = o.ID
+	}
+
+	replyCountMap := make(map[uuid.UUID]int64)
+	if len(obsIDs) > 0 {
+		replyCounts, rcErr := s.queries.CountRepliesByObservacaoIDs(ctx, obsIDs)
+		if rcErr == nil {
+			for _, rc := range replyCounts {
+				pid := uuid.UUID(rc.ParentID.Bytes)
+				replyCountMap[pid] = rc.ReplyCount
+			}
+		}
+	}
+
 	items := make([]dto.ObservacaoItem, len(obs))
 	for i, o := range obs {
 		items[i] = observacaoToItem(o, userEmail, isAdmin)
+		items[i].ReplyCount = replyCountMap[o.ID]
 	}
 
 	return &dto.ListObservacoesResponse{
@@ -65,6 +83,15 @@ func (s *ObservacaoService) Create(ctx context.Context, protocolID int, protocol
 	// Buscar setor do autor no SAGI
 	setor := s.resolveUserSector(ctx, userEmail)
 
+	var parentID pgtype.UUID
+	if req.ParentID != nil && *req.ParentID != "" {
+		parsed, err := uuid.Parse(*req.ParentID)
+		if err != nil {
+			return nil, fmt.Errorf("parent_id inválido: %w", err)
+		}
+		parentID = pgtype.UUID{Bytes: parsed, Valid: true}
+	}
+
 	obs, err := s.queries.CreateObservacao(ctx, db.CreateObservacaoParams{
 		ProtocoloSagi:  protocolNumber,
 		ProtocolID:     pgtype.Int4{Int32: int32(protocolID), Valid: true},
@@ -74,6 +101,7 @@ func (s *ObservacaoService) Create(ctx context.Context, protocolID int, protocol
 		AutorEmail:     userEmail,
 		AutorNome:      userName,
 		AutorSetor:     pgtype.Text{String: setor, Valid: setor != ""},
+		ParentID:       parentID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("erro ao criar observação: %w", err)
@@ -255,12 +283,19 @@ func observacaoToItem(o db.Observaco, userEmail string, isAdmin bool) dto.Observ
 
 	isAuthor := o.AutorEmail == userEmail
 
+	var parentID *string
+	if o.ParentID.Valid {
+		pid := uuid.UUID(o.ParentID.Bytes).String()
+		parentID = &pid
+	}
+
 	return dto.ObservacaoItem{
 		ID:              o.ID.String(),
 		ProtocolID:      protocolID,
 		ProtocolSource:  o.ProtocolSource.String,
 		Content:         o.Texto,
 		IsImportant:     o.IsImportant.Valid && o.IsImportant.Bool,
+		ParentID:        parentID,
 		CreatedByEmail:  o.AutorEmail,
 		CreatedByName:   o.AutorNome,
 		CreatedBySector: o.AutorSetor.String,

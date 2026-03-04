@@ -26,10 +26,15 @@ async function createObservacao(data: {
   id: number;
   content: string;
   is_important: boolean;
+  parent_id?: string;
 }): Promise<Observacao> {
   return apiClient.post<Observacao>(
     `/protocolos/${data.source}/${data.id}/observacoes`,
-    { content: data.content, is_important: data.is_important }
+    {
+      content: data.content,
+      is_important: data.is_important,
+      ...(data.parent_id && { parent_id: data.parent_id }),
+    }
   );
 }
 

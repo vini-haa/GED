@@ -13,6 +13,38 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import type { TramitacaoSetorItem } from '@/lib/types';
 
+const MAX_LABEL_CHARS = 28;
+const BAR_HEIGHT = 40;
+const CHART_MIN_HEIGHT = 280;
+
+function truncateLabel(label: string, maxChars: number): string {
+  if (label.length <= maxChars) return label;
+  return label.slice(0, maxChars - 1).trimEnd() + '…';
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function CustomYAxisTick(props: any) {
+  const { x, y, payload } = props;
+  const fullLabel = payload.value as string;
+  const displayLabel = truncateLabel(fullLabel, MAX_LABEL_CHARS);
+
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <title>{fullLabel}</title>
+      <text
+        x={-4}
+        y={0}
+        dy={4}
+        textAnchor="end"
+        fontSize={11}
+        fill="hsl(var(--muted-foreground))"
+      >
+        {displayLabel}
+      </text>
+    </g>
+  );
+}
+
 interface ChartTramitacaoSetorProps {
   data: TramitacaoSetorItem[] | undefined;
   isLoading: boolean;
@@ -50,6 +82,8 @@ export function ChartTramitacaoSetor({
   const media =
     data.reduce((sum, d) => sum + d.tempoMedioDias, 0) / data.length;
 
+  const chartHeight = Math.max(CHART_MIN_HEIGHT, data.length * BAR_HEIGHT);
+
   return (
     <div className="rounded-xl border border-border/50 bg-card/50 p-4">
       <div className="flex items-center justify-between">
@@ -71,9 +105,9 @@ export function ChartTramitacaoSetor({
         </div>
       </div>
 
-      <div className="mt-4 h-[320px]">
+      <div className="mt-4 overflow-x-auto" style={{ height: chartHeight }}>
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} layout="vertical" barSize={16}>
+          <BarChart data={data} layout="vertical" barSize={16} margin={{ left: 8 }}>
             <CartesianGrid
               strokeDasharray="3 3"
               stroke="hsl(var(--border))"
@@ -90,10 +124,11 @@ export function ChartTramitacaoSetor({
             <YAxis
               dataKey="setor"
               type="category"
-              tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+              tick={<CustomYAxisTick />}
               tickLine={false}
               axisLine={false}
-              width={120}
+              width={200}
+              interval={0}
             />
             <Tooltip
               contentStyle={{

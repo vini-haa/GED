@@ -17,6 +17,8 @@ interface ProtocoloCountersProps {
 export function ProtocoloCounters({ setor }: ProtocoloCountersProps) {
   const { data: counters, isLoading } = useProtocoloCounters(setor);
 
+  const isGlobal = !setor || setor === 0;
+
   if (isLoading) {
     return (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -38,9 +40,9 @@ export function ProtocoloCounters({ setor }: ProtocoloCountersProps) {
 
   const cards = [
     {
-      title: 'Protocolos no Setor',
+      title: isGlobal ? 'Total de Protocolos' : 'Protocolos no Setor',
       value: counters?.total_protocolos ?? 0,
-      description: 'vinculados ao seu setor',
+      description: isGlobal ? 'registrados no sistema' : 'vinculados ao seu setor',
       icon: FileText,
     },
     {
@@ -52,7 +54,7 @@ export function ProtocoloCounters({ setor }: ProtocoloCountersProps) {
     {
       title: 'Total de Documentos',
       value: counters?.docs_anexados ?? 0,
-      description: 'em todos os protocolos',
+      description: isGlobal ? 'anexados no sistema' : 'em todos os protocolos',
       icon: Files,
     },
   ];

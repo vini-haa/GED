@@ -18,6 +18,14 @@ interface ChartUploadsPeriodoProps {
   isLoading: boolean;
 }
 
+function formatDateTick(value: string): string {
+  const parts = value.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}`;
+  }
+  return value;
+}
+
 export function ChartUploadsPeriodo({
   data,
   isLoading,
@@ -31,16 +39,20 @@ export function ChartUploadsPeriodo({
     );
   }
 
-  if (!data || data.length === 0) {
+  const hasAnyData = data && data.some(
+    (d) => d.uploads > 0 || d.protocolos_externos > 0 || d.protocolos_internos > 0
+  );
+
+  if (!data || !hasAnyData) {
     return (
       <div className="rounded-xl border border-border/50 bg-card/50 p-4">
-        <h3 className="text-sm font-medium">Uploads e Protocolos por Dia</h3>
+        <h3 className="text-sm font-medium">Atividade Diária</h3>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Evolução nos últimos 30 dias
+          Protocolos criados e documentos anexados por dia
         </p>
         <div className="mt-4 flex h-[280px] items-center justify-center">
           <p className="text-sm text-muted-foreground">
-            Nenhum upload registrado no período
+            Nenhuma atividade registrada no período
           </p>
         </div>
       </div>
@@ -49,9 +61,9 @@ export function ChartUploadsPeriodo({
 
   return (
     <div className="rounded-xl border border-border/50 bg-card/50 p-4">
-      <h3 className="text-sm font-medium">Uploads e Protocolos por Dia</h3>
+      <h3 className="text-sm font-medium">Atividade Diária</h3>
       <p className="mt-0.5 text-xs text-muted-foreground">
-        Evolução nos últimos 30 dias
+        Protocolos criados e documentos anexados por dia
       </p>
 
       <div className="mt-4 h-[280px]">
@@ -67,6 +79,7 @@ export function ChartUploadsPeriodo({
               tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
               tickLine={false}
               axisLine={false}
+              tickFormatter={formatDateTick}
               interval="preserveStartEnd"
             />
             <YAxis
@@ -74,6 +87,7 @@ export function ChartUploadsPeriodo({
               tickLine={false}
               axisLine={false}
               width={30}
+              allowDecimals={false}
             />
             <Tooltip
               contentStyle={{
@@ -83,24 +97,34 @@ export function ChartUploadsPeriodo({
                 borderRadius: '8px',
                 fontSize: '12px',
               }}
+              labelFormatter={formatDateTick}
             />
             <Legend
               wrapperStyle={{ fontSize: '12px' }}
             />
             <Line
               type="monotone"
-              dataKey="uploads"
-              name="Uploads"
-              stroke="#2563eb"
+              dataKey="protocolos_externos"
+              name="Prot. Externos"
+              stroke="#7c3aed"
               strokeWidth={2}
               dot={false}
               activeDot={{ r: 4 }}
             />
             <Line
               type="monotone"
-              dataKey="protocolos"
-              name="Protocolos"
-              stroke="#7c3aed"
+              dataKey="protocolos_internos"
+              name="Prot. Internos"
+              stroke="#0891b2"
+              strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 4 }}
+            />
+            <Line
+              type="monotone"
+              dataKey="uploads"
+              name="Documentos"
+              stroke="#2563eb"
               strokeWidth={2}
               dot={false}
               activeDot={{ r: 4 }}

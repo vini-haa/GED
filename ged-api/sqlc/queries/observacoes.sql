@@ -2,8 +2,9 @@
 INSERT INTO observacoes (
     protocolo_sagi, protocol_id, protocol_source,
     texto, is_important,
-    autor_email, autor_nome, autor_setor
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    autor_email, autor_nome, autor_setor,
+    parent_id
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING *;
 
 -- name: ListObservacoesByProtocol :many
@@ -31,3 +32,10 @@ WHERE id = $1 AND deleted_at IS NULL RETURNING *;
 SELECT COUNT(*) FROM observacoes
 WHERE protocol_id = $1 AND protocol_source = $2
   AND deleted_at IS NULL AND criado_em > NOW() - INTERVAL '48 hours';
+
+-- name: CountRepliesByObservacaoIDs :many
+SELECT parent_id, COUNT(*) AS reply_count
+FROM observacoes
+WHERE parent_id = ANY($1::uuid[])
+  AND deleted_at IS NULL
+GROUP BY parent_id;

@@ -49,15 +49,31 @@ SELECT COUNT(*) FROM internal_protocols
 WHERE is_deleted = FALSE
   AND ($1::INTEGER IS NULL OR current_sector_code = $1)
   AND ($2::VARCHAR IS NULL OR status = $2)
+  AND ($3::VARCHAR IS NULL OR (
+    subject ILIKE '%' || $3 || '%'
+    OR protocol_number ILIKE '%' || $3 || '%'
+    OR interested ILIKE '%' || $3 || '%'
+    OR project_name ILIKE '%' || $3 || '%'
+    OR current_sector_name ILIKE '%' || $3 || '%'
+    OR observations ILIKE '%' || $3 || '%'
+  ))
+  AND ($4::VARCHAR IS NULL OR project_name ILIKE '%' || $4 || '%')
 `
 
 type CountInternalProtocolsParams struct {
-	SectorCode pgtype.Int4 `json:"sector_code"`
-	Status     pgtype.Text `json:"status"`
+	SectorCode  pgtype.Int4 `json:"sector_code"`
+	Status      pgtype.Text `json:"status"`
+	Search      pgtype.Text `json:"search"`
+	ProjectName pgtype.Text `json:"project_name"`
 }
 
 func (q *Queries) CountInternalProtocols(ctx context.Context, arg CountInternalProtocolsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countInternalProtocols, arg.SectorCode, arg.Status)
+	row := q.db.QueryRow(ctx, countInternalProtocols,
+		arg.SectorCode,
+		arg.Status,
+		arg.Search,
+		arg.ProjectName,
+	)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -113,9 +129,10 @@ INSERT INTO internal_protocols (
     protocol_number, year, sequence,
     subject, interested, sender, project_name,
     current_sector_code, current_sector_name,
-    created_by_id, created_by_email, created_by_name
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-RETURNING id, protocol_number, year, sequence, subject, interested, sender, project_name, current_sector_code, current_sector_name, status, cancel_reason, created_by_id, created_by_email, created_by_name, created_at, updated_at, is_deleted, deleted_at, deleted_by_email, delete_reason
+    created_by_id, created_by_email, created_by_name,
+    observations
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+RETURNING id, protocol_number, year, sequence, subject, interested, sender, project_name, current_sector_code, current_sector_name, status, cancel_reason, created_by_id, created_by_email, created_by_name, created_at, updated_at, is_deleted, deleted_at, deleted_by_email, delete_reason, observations
 `
 
 type CreateInternalProtocolParams struct {
@@ -131,6 +148,7 @@ type CreateInternalProtocolParams struct {
 	CreatedByID       string      `json:"created_by_id"`
 	CreatedByEmail    string      `json:"created_by_email"`
 	CreatedByName     pgtype.Text `json:"created_by_name"`
+	Observations      string      `json:"observations"`
 }
 
 func (q *Queries) CreateInternalProtocol(ctx context.Context, arg CreateInternalProtocolParams) (InternalProtocol, error) {
@@ -147,6 +165,7 @@ func (q *Queries) CreateInternalProtocol(ctx context.Context, arg CreateInternal
 		arg.CreatedByID,
 		arg.CreatedByEmail,
 		arg.CreatedByName,
+		arg.Observations,
 	)
 	var i InternalProtocol
 	err := row.Scan(
@@ -171,12 +190,13 @@ func (q *Queries) CreateInternalProtocol(ctx context.Context, arg CreateInternal
 		&i.DeletedAt,
 		&i.DeletedByEmail,
 		&i.DeleteReason,
+		&i.Observations,
 	)
 	return i, err
 }
 
 const getInternalProtocolByID = `-- name: GetInternalProtocolByID :one
-SELECT id, protocol_number, year, sequence, subject, interested, sender, project_name, current_sector_code, current_sector_name, status, cancel_reason, created_by_id, created_by_email, created_by_name, created_at, updated_at, is_deleted, deleted_at, deleted_by_email, delete_reason FROM internal_protocols WHERE id = $1 AND is_deleted = FALSE
+SELECT id, protocol_number, year, sequence, subject, interested, sender, project_name, current_sector_code, current_sector_name, status, cancel_reason, created_by_id, created_by_email, created_by_name, created_at, updated_at, is_deleted, deleted_at, deleted_by_email, delete_reason, observations FROM internal_protocols WHERE id = $1 AND is_deleted = FALSE
 `
 
 func (q *Queries) GetInternalProtocolByID(ctx context.Context, id int32) (InternalProtocol, error) {
@@ -204,6 +224,7 @@ func (q *Queries) GetInternalProtocolByID(ctx context.Context, id int32) (Intern
 		&i.DeletedAt,
 		&i.DeletedByEmail,
 		&i.DeleteReason,
+		&i.Observations,
 	)
 	return i, err
 }
@@ -221,19 +242,30 @@ func (q *Queries) GetNextSequence(ctx context.Context, year int32) (int32, error
 }
 
 const listInternalProtocols = `-- name: ListInternalProtocols :many
-SELECT id, protocol_number, year, sequence, subject, interested, sender, project_name, current_sector_code, current_sector_name, status, cancel_reason, created_by_id, created_by_email, created_by_name, created_at, updated_at, is_deleted, deleted_at, deleted_by_email, delete_reason FROM internal_protocols
+SELECT id, protocol_number, year, sequence, subject, interested, sender, project_name, current_sector_code, current_sector_name, status, cancel_reason, created_by_id, created_by_email, created_by_name, created_at, updated_at, is_deleted, deleted_at, deleted_by_email, delete_reason, observations FROM internal_protocols
 WHERE is_deleted = FALSE
   AND ($3::INTEGER IS NULL OR current_sector_code = $3)
   AND ($4::VARCHAR IS NULL OR status = $4)
+  AND ($5::VARCHAR IS NULL OR (
+    subject ILIKE '%' || $5 || '%'
+    OR protocol_number ILIKE '%' || $5 || '%'
+    OR interested ILIKE '%' || $5 || '%'
+    OR project_name ILIKE '%' || $5 || '%'
+    OR current_sector_name ILIKE '%' || $5 || '%'
+    OR observations ILIKE '%' || $5 || '%'
+  ))
+  AND ($6::VARCHAR IS NULL OR project_name ILIKE '%' || $6 || '%')
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2
 `
 
 type ListInternalProtocolsParams struct {
-	Limit      int32       `json:"limit"`
-	Offset     int32       `json:"offset"`
-	SectorCode pgtype.Int4 `json:"sector_code"`
-	Status     pgtype.Text `json:"status"`
+	Limit       int32       `json:"limit"`
+	Offset      int32       `json:"offset"`
+	SectorCode  pgtype.Int4 `json:"sector_code"`
+	Status      pgtype.Text `json:"status"`
+	Search      pgtype.Text `json:"search"`
+	ProjectName pgtype.Text `json:"project_name"`
 }
 
 func (q *Queries) ListInternalProtocols(ctx context.Context, arg ListInternalProtocolsParams) ([]InternalProtocol, error) {
@@ -242,6 +274,8 @@ func (q *Queries) ListInternalProtocols(ctx context.Context, arg ListInternalPro
 		arg.Offset,
 		arg.SectorCode,
 		arg.Status,
+		arg.Search,
+		arg.ProjectName,
 	)
 	if err != nil {
 		return nil, err
@@ -272,6 +306,7 @@ func (q *Queries) ListInternalProtocols(ctx context.Context, arg ListInternalPro
 			&i.DeletedAt,
 			&i.DeletedByEmail,
 			&i.DeleteReason,
+			&i.Observations,
 		); err != nil {
 			return nil, err
 		}
@@ -288,7 +323,7 @@ UPDATE internal_protocols
 SET is_deleted = TRUE, deleted_at = NOW(),
     deleted_by_email = $2, delete_reason = $3
 WHERE id = $1 AND is_deleted = FALSE
-RETURNING id, protocol_number, year, sequence, subject, interested, sender, project_name, current_sector_code, current_sector_name, status, cancel_reason, created_by_id, created_by_email, created_by_name, created_at, updated_at, is_deleted, deleted_at, deleted_by_email, delete_reason
+RETURNING id, protocol_number, year, sequence, subject, interested, sender, project_name, current_sector_code, current_sector_name, status, cancel_reason, created_by_id, created_by_email, created_by_name, created_at, updated_at, is_deleted, deleted_at, deleted_by_email, delete_reason, observations
 `
 
 type SoftDeleteInternalProtocolParams struct {
@@ -322,6 +357,7 @@ func (q *Queries) SoftDeleteInternalProtocol(ctx context.Context, arg SoftDelete
 		&i.DeletedAt,
 		&i.DeletedByEmail,
 		&i.DeleteReason,
+		&i.Observations,
 	)
 	return i, err
 }
@@ -331,17 +367,19 @@ UPDATE internal_protocols
 SET subject = COALESCE($2, subject),
     interested = COALESCE($3, interested),
     sender = COALESCE($4, sender),
-    project_name = COALESCE($5, project_name)
+    project_name = COALESCE($5, project_name),
+    observations = COALESCE($6, observations)
 WHERE id = $1 AND is_deleted = FALSE
-RETURNING id, protocol_number, year, sequence, subject, interested, sender, project_name, current_sector_code, current_sector_name, status, cancel_reason, created_by_id, created_by_email, created_by_name, created_at, updated_at, is_deleted, deleted_at, deleted_by_email, delete_reason
+RETURNING id, protocol_number, year, sequence, subject, interested, sender, project_name, current_sector_code, current_sector_name, status, cancel_reason, created_by_id, created_by_email, created_by_name, created_at, updated_at, is_deleted, deleted_at, deleted_by_email, delete_reason, observations
 `
 
 type UpdateInternalProtocolParams struct {
-	ID          int32       `json:"id"`
-	Subject     pgtype.Text `json:"subject"`
-	Interested  pgtype.Text `json:"interested"`
-	Sender      pgtype.Text `json:"sender"`
-	ProjectName pgtype.Text `json:"project_name"`
+	ID           int32       `json:"id"`
+	Subject      pgtype.Text `json:"subject"`
+	Interested   pgtype.Text `json:"interested"`
+	Sender       pgtype.Text `json:"sender"`
+	ProjectName  pgtype.Text `json:"project_name"`
+	Observations pgtype.Text `json:"observations"`
 }
 
 func (q *Queries) UpdateInternalProtocol(ctx context.Context, arg UpdateInternalProtocolParams) (InternalProtocol, error) {
@@ -351,6 +389,7 @@ func (q *Queries) UpdateInternalProtocol(ctx context.Context, arg UpdateInternal
 		arg.Interested,
 		arg.Sender,
 		arg.ProjectName,
+		arg.Observations,
 	)
 	var i InternalProtocol
 	err := row.Scan(
@@ -375,6 +414,7 @@ func (q *Queries) UpdateInternalProtocol(ctx context.Context, arg UpdateInternal
 		&i.DeletedAt,
 		&i.DeletedByEmail,
 		&i.DeleteReason,
+		&i.Observations,
 	)
 	return i, err
 }
@@ -400,7 +440,7 @@ const updateInternalProtocolStatus = `-- name: UpdateInternalProtocolStatus :one
 UPDATE internal_protocols
 SET status = $2, cancel_reason = $3
 WHERE id = $1 AND is_deleted = FALSE
-RETURNING id, protocol_number, year, sequence, subject, interested, sender, project_name, current_sector_code, current_sector_name, status, cancel_reason, created_by_id, created_by_email, created_by_name, created_at, updated_at, is_deleted, deleted_at, deleted_by_email, delete_reason
+RETURNING id, protocol_number, year, sequence, subject, interested, sender, project_name, current_sector_code, current_sector_name, status, cancel_reason, created_by_id, created_by_email, created_by_name, created_at, updated_at, is_deleted, deleted_at, deleted_by_email, delete_reason, observations
 `
 
 type UpdateInternalProtocolStatusParams struct {
@@ -434,6 +474,7 @@ func (q *Queries) UpdateInternalProtocolStatus(ctx context.Context, arg UpdateIn
 		&i.DeletedAt,
 		&i.DeletedByEmail,
 		&i.DeleteReason,
+		&i.Observations,
 	)
 	return i, err
 }

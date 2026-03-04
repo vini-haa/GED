@@ -55,11 +55,12 @@ type DashboardKpi struct {
 	Formato  string  `json:"formato"` // "numero" ou "dias"
 }
 
-// UploadsPeriodoItem representa um ponto no gráfico de uploads por período.
+// UploadsPeriodoItem representa um ponto no gráfico de atividade por dia.
 type UploadsPeriodoItem struct {
-	Data       string `json:"data"`
-	Uploads    int64  `json:"uploads"`
-	Protocolos int64  `json:"protocolos"`
+	Data               string `json:"data"`
+	Uploads            int64  `json:"uploads"`
+	ProtocolosExternos int64  `json:"protocolos_externos"`
+	ProtocolosInternos int64  `json:"protocolos_internos"`
 }
 
 // DocsPorTipoItem representa um segmento no gráfico de pizza por tipo de documento.

@@ -92,18 +92,19 @@ func GenerateDashboardPDF(data DashboardExportData) ([]byte, error) {
 	// Seção 2 — Uploads por Período
 	pdfSection(pdf, "2. Uploads por Período")
 	if len(data.Uploads) > 0 {
-		colW := []float64{60, 50, 50}
+		colW := []float64{40, 35, 40, 40}
 		maxRows := 30
 		if len(data.Uploads) < maxRows {
 			maxRows = len(data.Uploads)
 		}
-		pdfTableHeader(pdf, colW, []string{"Data", "Uploads", "Protocolos"})
+		pdfTableHeader(pdf, colW, []string{"Data", "Uploads", "Prot. Externos", "Prot. Internos"})
 		pdf.SetFont("Helvetica", "", 9)
 		for i := 0; i < maxRows; i++ {
 			u := data.Uploads[i]
 			pdf.CellFormat(colW[0], 6, u.Data, "1", 0, "L", false, 0, "")
 			pdf.CellFormat(colW[1], 6, fmt.Sprintf("%d", u.Uploads), "1", 0, "R", false, 0, "")
-			pdf.CellFormat(colW[2], 6, fmt.Sprintf("%d", u.Protocolos), "1", 0, "R", false, 0, "")
+			pdf.CellFormat(colW[2], 6, fmt.Sprintf("%d", u.ProtocolosExternos), "1", 0, "R", false, 0, "")
+			pdf.CellFormat(colW[3], 6, fmt.Sprintf("%d", u.ProtocolosInternos), "1", 0, "R", false, 0, "")
 			pdf.Ln(-1)
 		}
 		if len(data.Uploads) > maxRows {
@@ -278,7 +279,7 @@ func GenerateDashboardExcel(data DashboardExportData) ([]byte, error) {
 	// Aba 2 — Uploads
 	sheet2 := "Uploads"
 	f.NewSheet(sheet2)
-	uploadsHeaders := []string{"Data", "Uploads", "Protocolos"}
+	uploadsHeaders := []string{"Data", "Uploads", "Prot. Externos", "Prot. Internos"}
 	for i, h := range uploadsHeaders {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
 		f.SetCellValue(sheet2, cell, h)
@@ -288,8 +289,9 @@ func GenerateDashboardExcel(data DashboardExportData) ([]byte, error) {
 		row := i + 2
 		f.SetCellValue(sheet2, cellName(1, row), u.Data)
 		f.SetCellValue(sheet2, cellName(2, row), u.Uploads)
-		f.SetCellValue(sheet2, cellName(3, row), u.Protocolos)
-		f.SetCellStyle(sheet2, cellName(1, row), cellName(3, row), cellStyle)
+		f.SetCellValue(sheet2, cellName(3, row), u.ProtocolosExternos)
+		f.SetCellValue(sheet2, cellName(4, row), u.ProtocolosInternos)
+		f.SetCellStyle(sheet2, cellName(1, row), cellName(4, row), cellStyle)
 	}
 	f.SetColWidth(sheet2, "A", "A", 15)
 	f.SetColWidth(sheet2, "B", "C", 12)

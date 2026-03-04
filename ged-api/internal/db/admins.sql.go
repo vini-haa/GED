@@ -36,7 +36,7 @@ func (q *Queries) CountAdmins(ctx context.Context) (int64, error) {
 const createAdmin = `-- name: CreateAdmin :one
 INSERT INTO admins (email, nome, role, criado_por)
 VALUES ($1, $2, $3, $4)
-RETURNING id, email, nome, role, ativo, criado_por, criado_em, atualizado_em
+RETURNING id, email, nome, role, ativo, criado_por, criado_em, atualizado_em, setor
 `
 
 type CreateAdminParams struct {
@@ -63,6 +63,7 @@ func (q *Queries) CreateAdmin(ctx context.Context, arg CreateAdminParams) (Admin
 		&i.CriadoPor,
 		&i.CriadoEm,
 		&i.AtualizadoEm,
+		&i.Setor,
 	)
 	return i, err
 }
@@ -78,7 +79,7 @@ func (q *Queries) DeactivateAdmin(ctx context.Context, id uuid.UUID) error {
 }
 
 const getAdminByEmail = `-- name: GetAdminByEmail :one
-SELECT id, email, nome, role, ativo, criado_por, criado_em, atualizado_em FROM admins
+SELECT id, email, nome, role, ativo, criado_por, criado_em, atualizado_em, setor FROM admins
 WHERE email = $1 AND ativo = true
 `
 
@@ -94,12 +95,13 @@ func (q *Queries) GetAdminByEmail(ctx context.Context, email string) (Admin, err
 		&i.CriadoPor,
 		&i.CriadoEm,
 		&i.AtualizadoEm,
+		&i.Setor,
 	)
 	return i, err
 }
 
 const getAdminByEmailAny = `-- name: GetAdminByEmailAny :one
-SELECT id, email, nome, role, ativo, criado_por, criado_em, atualizado_em FROM admins
+SELECT id, email, nome, role, ativo, criado_por, criado_em, atualizado_em, setor FROM admins
 WHERE email = $1
 `
 
@@ -115,12 +117,13 @@ func (q *Queries) GetAdminByEmailAny(ctx context.Context, email string) (Admin, 
 		&i.CriadoPor,
 		&i.CriadoEm,
 		&i.AtualizadoEm,
+		&i.Setor,
 	)
 	return i, err
 }
 
 const getAdminByID = `-- name: GetAdminByID :one
-SELECT id, email, nome, role, ativo, criado_por, criado_em, atualizado_em FROM admins
+SELECT id, email, nome, role, ativo, criado_por, criado_em, atualizado_em, setor FROM admins
 WHERE id = $1
 `
 
@@ -136,12 +139,13 @@ func (q *Queries) GetAdminByID(ctx context.Context, id uuid.UUID) (Admin, error)
 		&i.CriadoPor,
 		&i.CriadoEm,
 		&i.AtualizadoEm,
+		&i.Setor,
 	)
 	return i, err
 }
 
 const listAdmins = `-- name: ListAdmins :many
-SELECT id, email, nome, role, ativo, criado_por, criado_em, atualizado_em FROM admins
+SELECT id, email, nome, role, ativo, criado_por, criado_em, atualizado_em, setor FROM admins
 ORDER BY criado_em DESC
 LIMIT $1 OFFSET $2
 `
@@ -169,6 +173,7 @@ func (q *Queries) ListAdmins(ctx context.Context, arg ListAdminsParams) ([]Admin
 			&i.CriadoPor,
 			&i.CriadoEm,
 			&i.AtualizadoEm,
+			&i.Setor,
 		); err != nil {
 			return nil, err
 		}

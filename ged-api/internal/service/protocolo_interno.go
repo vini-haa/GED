@@ -104,6 +104,7 @@ func (s *InternalProtocolService) Create(ctx context.Context, req dto.CreateInte
 			CreatedByID:       userEmail,
 			CreatedByEmail:    userEmail,
 			CreatedByName:     pgtype.Text{String: userName, Valid: userName != ""},
+			Observations:      req.Observations,
 		})
 		if err != nil {
 			return fmt.Errorf("erro ao criar protocolo: %w", err)
@@ -161,6 +162,12 @@ func (s *InternalProtocolService) List(ctx context.Context, q dto.ListInternalPr
 	if q.Status != "" {
 		params.Status = pgtype.Text{String: q.Status, Valid: true}
 	}
+	if q.Search != "" {
+		params.Search = pgtype.Text{String: q.Search, Valid: true}
+	}
+	if q.Projeto != "" {
+		params.ProjectName = pgtype.Text{String: q.Projeto, Valid: true}
+	}
 
 	protocols, err := s.queries.ListInternalProtocols(ctx, params)
 	if err != nil {
@@ -168,8 +175,10 @@ func (s *InternalProtocolService) List(ctx context.Context, q dto.ListInternalPr
 	}
 
 	countParams := db.CountInternalProtocolsParams{
-		SectorCode: params.SectorCode,
-		Status:     params.Status,
+		SectorCode:  params.SectorCode,
+		Status:      params.Status,
+		Search:      params.Search,
+		ProjectName: params.ProjectName,
 	}
 	total, err := s.queries.CountInternalProtocols(ctx, countParams)
 	if err != nil {
@@ -198,6 +207,7 @@ func (s *InternalProtocolService) List(ctx context.Context, q dto.ListInternalPr
 			Interested:        p.Interested,
 			Sender:            p.Sender,
 			ProjectName:       p.ProjectName,
+			Observations:      p.Observations,
 			CurrentSectorName: p.CurrentSectorName,
 			CurrentSectorCode: p.CurrentSectorCode,
 			Status:            p.Status,
@@ -235,7 +245,7 @@ func (s *InternalProtocolService) GetByID(ctx context.Context, id int32) (*dto.I
 // Update edita campos do protocolo interno.
 func (s *InternalProtocolService) Update(ctx context.Context, id int32, req dto.UpdateInternalProtocolRequest, userEmail, userName string) (*dto.InternalProtocolDetail, error) {
 	// Verificar que pelo menos 1 campo foi enviado
-	if req.Subject == nil && req.Interested == nil && req.Sender == nil && req.ProjectName == nil {
+	if req.Subject == nil && req.Interested == nil && req.Sender == nil && req.ProjectName == nil && req.Observations == nil {
 		return nil, fmt.Errorf("pelo menos um campo deve ser informado para atualização")
 	}
 
@@ -252,6 +262,9 @@ func (s *InternalProtocolService) Update(ctx context.Context, id int32, req dto.
 	if req.ProjectName != nil && len(*req.ProjectName) > 300 {
 		return nil, fmt.Errorf("project_name deve ter no máximo 300 caracteres")
 	}
+	if req.Observations != nil && len(*req.Observations) > 5000 {
+		return nil, fmt.Errorf("observations deve ter no máximo 5000 caracteres")
+	}
 
 	params := db.UpdateInternalProtocolParams{ID: id}
 	if req.Subject != nil {
@@ -265,6 +278,9 @@ func (s *InternalProtocolService) Update(ctx context.Context, id int32, req dto.
 	}
 	if req.ProjectName != nil {
 		params.ProjectName = pgtype.Text{String: *req.ProjectName, Valid: true}
+	}
+	if req.Observations != nil {
+		params.Observations = pgtype.Text{String: *req.Observations, Valid: true}
 	}
 
 	proto, err := s.queries.UpdateInternalProtocol(ctx, params)
@@ -638,6 +654,7 @@ func (s *InternalProtocolService) protocolToDetail(p db.InternalProtocol, docCou
 		Interested:        p.Interested,
 		Sender:            p.Sender,
 		ProjectName:       p.ProjectName,
+		Observations:      p.Observations,
 		CurrentSectorName: p.CurrentSectorName,
 		CurrentSectorCode: p.CurrentSectorCode,
 		Status:            p.Status,

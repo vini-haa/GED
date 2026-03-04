@@ -1,7 +1,6 @@
 'use client';
 
-import { formatDistanceToNow } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { formatDateTime } from '@/lib/date-utils';
 import {
   FileText,
   Image,
@@ -64,12 +63,7 @@ export function DocumentoCard({
   const { canDelete } = usePermissions();
   const Icon = getMimeIcon(documento.mime_type);
 
-  const timeAgo = documento.uploaded_at
-    ? formatDistanceToNow(new Date(documento.uploaded_at), {
-    addSuffix: true,
-    locale: ptBR,
-  })
-    : '—';
+  const uploadDate = formatDateTime(documento.uploaded_at);
 
   return (
     <div
@@ -109,7 +103,7 @@ export function DocumentoCard({
             <span className="hidden sm:inline">·</span>
             <span className="hidden sm:inline">{documento.uploaded_by_name}</span>
             <span>·</span>
-            <span>{timeAgo}</span>
+            <span>{uploadDate}</span>
           </div>
         </div>
       </div>

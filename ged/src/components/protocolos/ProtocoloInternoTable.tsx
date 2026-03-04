@@ -1,16 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { formatDistanceToNow } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { formatDateTime } from '@/lib/date-utils';
 import {
+  AlertTriangle,
   Eye,
   FolderOpen,
   Inbox,
   MoreHorizontal,
   Plus,
 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -29,14 +28,20 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { StatusBadge } from '@/components/protocolo-interno/StatusDropdown';
-import { useProtocolosInternos } from '@/hooks/use-protocolos-internos';
+import type { ProtocoloInterno } from '@/lib/types';
 import { formatSectorName } from '@/lib/types';
 
-export function ProtocoloInternoTable() {
-  const { data: response, isLoading } = useProtocolosInternos();
+interface ProtocoloInternoTableProps {
+  data: ProtocoloInterno[];
+  isLoading: boolean;
+  hasFilters: boolean;
+}
 
-  const items = response?.data ?? [];
-
+export function ProtocoloInternoTable({
+  data,
+  isLoading,
+  hasFilters,
+}: ProtocoloInternoTableProps) {
   if (isLoading) {
     return (
       <div className="rounded-xl border border-border/50 bg-card/50">
@@ -47,8 +52,10 @@ export function ProtocoloInternoTable() {
           >
             <Skeleton className="h-5 w-28" />
             <Skeleton className="h-5 flex-1" />
+            <Skeleton className="hidden h-5 w-28 lg:block" />
             <Skeleton className="hidden h-5 w-32 md:block" />
-            <Skeleton className="h-5 w-24" />
+            <Skeleton className="h-5 w-20" />
+            <Skeleton className="hidden h-5 w-10 sm:block" />
             <Skeleton className="hidden h-5 w-24 sm:block" />
             <Skeleton className="h-5 w-8" />
           </div>
@@ -57,19 +64,23 @@ export function ProtocoloInternoTable() {
     );
   }
 
-  if (items.length === 0) {
+  if (data.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-border/50 bg-card/50 py-16">
         <Inbox className="h-10 w-10 text-muted-foreground/50" />
         <p className="text-sm text-muted-foreground">
-          Nenhum protocolo interno cadastrado.
+          {hasFilters
+            ? 'Nenhum protocolo interno encontrado com os filtros aplicados.'
+            : 'Nenhum protocolo interno cadastrado.'}
         </p>
-        <Button variant="outline" asChild>
-          <Link href="/protocolo-interno/novo" className="gap-2">
-            <Plus className="h-4 w-4" />
-            Criar Protocolo Interno
-          </Link>
-        </Button>
+        {!hasFilters && (
+          <Button variant="outline" asChild>
+            <Link href="/protocolo-interno/novo" className="gap-2">
+              <Plus className="h-4 w-4" />
+              Criar Protocolo Interno
+            </Link>
+          </Button>
+        )}
       </div>
     );
   }
@@ -78,7 +89,7 @@ export function ProtocoloInternoTable() {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {items.length} protocolo{items.length !== 1 ? 's' : ''} interno{items.length !== 1 ? 's' : ''}
+          {data.length} protocolo{data.length !== 1 ? 's' : ''} interno{data.length !== 1 ? 's' : ''}
         </p>
         <Button size="sm" asChild>
           <Link href="/protocolo-interno/novo" className="gap-2">
@@ -94,12 +105,18 @@ export function ProtocoloInternoTable() {
             <TableRow className="hover:!bg-transparent">
               <TableHead>Protocolo</TableHead>
               <TableHead>Assunto</TableHead>
+              <TableHead className="hidden lg:table-cell">
+                Projeto
+              </TableHead>
               <TableHead className="hidden md:table-cell">
                 Setor Atual
               </TableHead>
               <TableHead className="text-center">Status</TableHead>
+              <TableHead className="hidden sm:table-cell text-center">
+                Docs
+              </TableHead>
               <TableHead className="hidden sm:table-cell">
-                Criado
+                Ultima Atividade
               </TableHead>
               <TableHead>
                 <span className="sr-only">Acoes</span>
@@ -107,7 +124,7 @@ export function ProtocoloInternoTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {items.map((protocolo) => (
+            {data.map((protocolo) => (
               <TableRow
                 key={protocolo.id}
                 className="!border-border/30 hover:!bg-muted/20"
@@ -124,19 +141,31 @@ export function ProtocoloInternoTable() {
                 <TableCell className="max-w-[200px] truncate">
                   {protocolo.subject}
                 </TableCell>
+                <TableCell className="hidden lg:table-cell max-w-[180px]">
+                  {protocolo.project_name ? (
+                    <span className="block truncate" title={protocolo.project_name}>
+                      {protocolo.project_name}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
                 <TableCell className="hidden md:table-cell">
                   {formatSectorName(protocolo.current_sector_name)}
                 </TableCell>
                 <TableCell className="text-center">
                   <StatusBadge status={protocolo.status} />
                 </TableCell>
+                <TableCell className="hidden sm:table-cell text-center">
+                  <span className="inline-flex items-center gap-1">
+                    {protocolo.doc_count}
+                    {protocolo.doc_count === 0 && (
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                    )}
+                  </span>
+                </TableCell>
                 <TableCell className="hidden sm:table-cell text-muted-foreground">
-                  {protocolo.created_at
-                    ? formatDistanceToNow(
-                        new Date(protocolo.created_at),
-                        { addSuffix: true, locale: ptBR }
-                      )
-                    : '—'}
+                  {formatDateTime(protocolo.created_at)}
                 </TableCell>
                 <TableCell>
                   <DropdownMenu>

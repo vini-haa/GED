@@ -30,13 +30,47 @@ func (q *Queries) CountRecentObservacoes(ctx context.Context, arg CountRecentObs
 	return count, err
 }
 
+const countRepliesByObservacaoIDs = `-- name: CountRepliesByObservacaoIDs :many
+SELECT parent_id, COUNT(*) AS reply_count
+FROM observacoes
+WHERE parent_id = ANY($1::uuid[])
+  AND deleted_at IS NULL
+GROUP BY parent_id
+`
+
+type CountRepliesByObservacaoIDsRow struct {
+	ParentID   pgtype.UUID `json:"parent_id"`
+	ReplyCount int64       `json:"reply_count"`
+}
+
+func (q *Queries) CountRepliesByObservacaoIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]CountRepliesByObservacaoIDsRow, error) {
+	rows, err := q.db.Query(ctx, countRepliesByObservacaoIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CountRepliesByObservacaoIDsRow{}
+	for rows.Next() {
+		var i CountRepliesByObservacaoIDsRow
+		if err := rows.Scan(&i.ParentID, &i.ReplyCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createObservacao = `-- name: CreateObservacao :one
 INSERT INTO observacoes (
     protocolo_sagi, protocol_id, protocol_source,
     texto, is_important,
-    autor_email, autor_nome, autor_setor
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, protocolo_sagi, texto, autor_email, autor_nome, criado_em, editado_em, deleted_at, deleted_by, motivo_exclusao, protocol_id, protocol_source, is_important, autor_setor
+    autor_email, autor_nome, autor_setor,
+    parent_id
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id, protocolo_sagi, texto, autor_email, autor_nome, criado_em, editado_em, deleted_at, deleted_by, motivo_exclusao, protocol_id, protocol_source, is_important, autor_setor, parent_id
 `
 
 type CreateObservacaoParams struct {
@@ -48,6 +82,7 @@ type CreateObservacaoParams struct {
 	AutorEmail     string      `json:"autor_email"`
 	AutorNome      string      `json:"autor_nome"`
 	AutorSetor     pgtype.Text `json:"autor_setor"`
+	ParentID       pgtype.UUID `json:"parent_id"`
 }
 
 func (q *Queries) CreateObservacao(ctx context.Context, arg CreateObservacaoParams) (Observaco, error) {
@@ -60,6 +95,7 @@ func (q *Queries) CreateObservacao(ctx context.Context, arg CreateObservacaoPara
 		arg.AutorEmail,
 		arg.AutorNome,
 		arg.AutorSetor,
+		arg.ParentID,
 	)
 	var i Observaco
 	err := row.Scan(
@@ -77,12 +113,13 @@ func (q *Queries) CreateObservacao(ctx context.Context, arg CreateObservacaoPara
 		&i.ProtocolSource,
 		&i.IsImportant,
 		&i.AutorSetor,
+		&i.ParentID,
 	)
 	return i, err
 }
 
 const getObservacaoByID = `-- name: GetObservacaoByID :one
-SELECT id, protocolo_sagi, texto, autor_email, autor_nome, criado_em, editado_em, deleted_at, deleted_by, motivo_exclusao, protocol_id, protocol_source, is_important, autor_setor FROM observacoes WHERE id = $1
+SELECT id, protocolo_sagi, texto, autor_email, autor_nome, criado_em, editado_em, deleted_at, deleted_by, motivo_exclusao, protocol_id, protocol_source, is_important, autor_setor, parent_id FROM observacoes WHERE id = $1
 `
 
 func (q *Queries) GetObservacaoByID(ctx context.Context, id uuid.UUID) (Observaco, error) {
@@ -103,12 +140,13 @@ func (q *Queries) GetObservacaoByID(ctx context.Context, id uuid.UUID) (Observac
 		&i.ProtocolSource,
 		&i.IsImportant,
 		&i.AutorSetor,
+		&i.ParentID,
 	)
 	return i, err
 }
 
 const listObservacoesByProtocol = `-- name: ListObservacoesByProtocol :many
-SELECT id, protocolo_sagi, texto, autor_email, autor_nome, criado_em, editado_em, deleted_at, deleted_by, motivo_exclusao, protocol_id, protocol_source, is_important, autor_setor FROM observacoes
+SELECT id, protocolo_sagi, texto, autor_email, autor_nome, criado_em, editado_em, deleted_at, deleted_by, motivo_exclusao, protocol_id, protocol_source, is_important, autor_setor, parent_id FROM observacoes
 WHERE protocol_id = $1 AND protocol_source = $2 AND deleted_at IS NULL
 ORDER BY is_important DESC, criado_em DESC
 `
@@ -142,6 +180,7 @@ func (q *Queries) ListObservacoesByProtocol(ctx context.Context, arg ListObserva
 			&i.ProtocolSource,
 			&i.IsImportant,
 			&i.AutorSetor,
+			&i.ParentID,
 		); err != nil {
 			return nil, err
 		}
@@ -156,7 +195,7 @@ func (q *Queries) ListObservacoesByProtocol(ctx context.Context, arg ListObserva
 const softDeleteObservacao = `-- name: SoftDeleteObservacao :one
 UPDATE observacoes
 SET deleted_at = NOW(), deleted_by = $2
-WHERE id = $1 AND deleted_at IS NULL RETURNING id, protocolo_sagi, texto, autor_email, autor_nome, criado_em, editado_em, deleted_at, deleted_by, motivo_exclusao, protocol_id, protocol_source, is_important, autor_setor
+WHERE id = $1 AND deleted_at IS NULL RETURNING id, protocolo_sagi, texto, autor_email, autor_nome, criado_em, editado_em, deleted_at, deleted_by, motivo_exclusao, protocol_id, protocol_source, is_important, autor_setor, parent_id
 `
 
 type SoftDeleteObservacaoParams struct {
@@ -182,13 +221,14 @@ func (q *Queries) SoftDeleteObservacao(ctx context.Context, arg SoftDeleteObserv
 		&i.ProtocolSource,
 		&i.IsImportant,
 		&i.AutorSetor,
+		&i.ParentID,
 	)
 	return i, err
 }
 
 const toggleObservacaoImportant = `-- name: ToggleObservacaoImportant :one
 UPDATE observacoes SET is_important = NOT is_important
-WHERE id = $1 AND deleted_at IS NULL RETURNING id, protocolo_sagi, texto, autor_email, autor_nome, criado_em, editado_em, deleted_at, deleted_by, motivo_exclusao, protocol_id, protocol_source, is_important, autor_setor
+WHERE id = $1 AND deleted_at IS NULL RETURNING id, protocolo_sagi, texto, autor_email, autor_nome, criado_em, editado_em, deleted_at, deleted_by, motivo_exclusao, protocol_id, protocol_source, is_important, autor_setor, parent_id
 `
 
 func (q *Queries) ToggleObservacaoImportant(ctx context.Context, id uuid.UUID) (Observaco, error) {
@@ -209,13 +249,14 @@ func (q *Queries) ToggleObservacaoImportant(ctx context.Context, id uuid.UUID) (
 		&i.ProtocolSource,
 		&i.IsImportant,
 		&i.AutorSetor,
+		&i.ParentID,
 	)
 	return i, err
 }
 
 const updateObservacaoContent = `-- name: UpdateObservacaoContent :one
 UPDATE observacoes SET texto = $2
-WHERE id = $1 AND deleted_at IS NULL RETURNING id, protocolo_sagi, texto, autor_email, autor_nome, criado_em, editado_em, deleted_at, deleted_by, motivo_exclusao, protocol_id, protocol_source, is_important, autor_setor
+WHERE id = $1 AND deleted_at IS NULL RETURNING id, protocolo_sagi, texto, autor_email, autor_nome, criado_em, editado_em, deleted_at, deleted_by, motivo_exclusao, protocol_id, protocol_source, is_important, autor_setor, parent_id
 `
 
 type UpdateObservacaoContentParams struct {
@@ -241,6 +282,7 @@ func (q *Queries) UpdateObservacaoContent(ctx context.Context, arg UpdateObserva
 		&i.ProtocolSource,
 		&i.IsImportant,
 		&i.AutorSetor,
+		&i.ParentID,
 	)
 	return i, err
 }

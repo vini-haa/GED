@@ -31,6 +31,18 @@ FROM documentos
 WHERE protocolo_sagi = ANY($1::varchar[])
   AND deleted_at IS NULL;
 
+-- name: CountDocsGlobal :one
+SELECT COUNT(*)
+FROM documentos
+WHERE deleted_at IS NULL;
+
+-- name: CountProtocolosComDocsGlobal :one
+SELECT COUNT(DISTINCT protocolo_sagi)
+FROM documentos
+WHERE deleted_at IS NULL
+  AND protocolo_sagi IS NOT NULL
+  AND protocolo_sagi != '';
+
 -- name: SearchProtocolosInternos :many
 SELECT id, numero, assunto, descricao, status, setor_origem, criado_por_email, criado_por_nome, criado_em, atualizado_em
 FROM protocolos_internos

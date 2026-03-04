@@ -167,6 +167,8 @@ export interface Observacao {
   protocol_source: string;
   content: string;
   is_important: boolean;
+  parent_id: string | null;
+  reply_count: number;
   created_by_email: string;
   created_by_name: string;
   created_by_sector: string;
@@ -227,6 +229,7 @@ export interface ProtocoloInterno {
   interested: string;
   sender: string;
   project_name: string;
+  observations: string;
   current_sector_name: string;
   current_sector_code: number;
   status: StatusProtocoloInterno;
@@ -244,6 +247,7 @@ export interface ProtocoloInternoDetalhe {
   interested: string;
   sender: string;
   project_name: string;
+  observations: string;
   current_sector_name: string;
   current_sector_code: number;
   status: StatusProtocoloInterno;
@@ -260,18 +264,16 @@ export interface ProtocoloInternoDetalhe {
 /** Request para criar protocolo interno — espelho de dto.CreateInternalProtocolRequest */
 export interface CreateProtocoloInternoRequest {
   subject: string;
-  interested: string;
-  sender: string;
   project_name: string;
+  observations: string;
   sector_code?: number;
 }
 
 /** Request para editar protocolo interno — espelho de dto.UpdateInternalProtocolRequest */
 export interface UpdateProtocoloInternoRequest {
   subject?: string;
-  interested?: string;
-  sender?: string;
   project_name?: string;
+  observations?: string;
 }
 
 /** Request para alterar status */
@@ -344,7 +346,8 @@ export interface DashboardKpi {
 export interface UploadsPeriodoItem {
   data: string;
   uploads: number;
-  protocolos: number;
+  protocolos_externos: number;
+  protocolos_internos: number;
 }
 
 export interface DocsPorTipoItem {

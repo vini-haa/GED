@@ -1,8 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
+import { useCallback, useMemo, useState } from 'react';
 import { MessageSquareOff, Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -19,17 +17,10 @@ import {
 import { ObservacaoForm } from './ObservacaoForm';
 import { ObservacaoCard } from './ObservacaoCard';
 import { useObservacoes, useDeleteObservacao } from '@/hooks/use-observacoes';
+import { useDownloadDocumento } from '@/hooks/use-documentos';
 import { usePermissions } from '@/hooks/use-permissions';
+import { toast } from '@/hooks/use-toast';
 import type { Observacao } from '@/lib/types';
-
-const deleteSchema = z.object({
-  motivo: z
-    .string()
-    .min(10, 'Justificativa deve ter pelo menos 10 caracteres')
-    .max(500, 'Justificativa deve ter no máximo 500 caracteres'),
-});
-
-type DeleteFormData = z.infer<typeof deleteSchema>;
 
 interface ObservacaoListProps {
   source: string;
@@ -40,71 +31,110 @@ export function ObservacaoList({ source, id }: ObservacaoListProps) {
   const { data: response, isLoading } = useObservacoes(source, id);
   const { canEdit } = usePermissions();
   const deleteMutation = useDeleteObservacao();
+  const downloadMutation = useDownloadDocumento();
+
+  const handleDocClick = useCallback(
+    (docId: string) => {
+      downloadMutation.mutate(docId, {
+        onSuccess: (blob) => {
+          const url = URL.createObjectURL(blob);
+          window.open(url, '_blank');
+          setTimeout(() => URL.revokeObjectURL(url), 30000);
+        },
+        onError: () => {
+          toast({
+            title: 'Erro',
+            description: 'Não foi possível abrir o documento.',
+            variant: 'destructive',
+          });
+        },
+      });
+    },
+    [downloadMutation]
+  );
 
   const [deleteObs, setDeleteObs] = useState<Observacao | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<DeleteFormData>({
-    defaultValues: { motivo: '' },
-  });
-
-  useEffect(() => {
-    if (deleteOpen) {
-      reset({ motivo: '' });
-    }
-  }, [deleteOpen, reset]);
+  const [deleteMotivo, setDeleteMotivo] = useState('');
 
   const observacoes = response?.data;
 
-  // Ordenar: importantes primeiro, depois cronologica reversa
-  const sorted = useMemo(() => {
-    if (!observacoes) return [];
+  // Organizar em árvore: pais (sem parent_id) e filhos (com parent_id)
+  const { rootObservacoes, repliesMap } = useMemo(() => {
+    if (!observacoes) return { rootObservacoes: [], repliesMap: new Map<string, Observacao[]>() };
 
-    const importantes = observacoes
+    const roots: Observacao[] = [];
+    const map = new Map<string, Observacao[]>();
+
+    for (const obs of observacoes) {
+      if (obs.parent_id) {
+        const existing = map.get(obs.parent_id) ?? [];
+        existing.push(obs);
+        map.set(obs.parent_id, existing);
+      } else {
+        roots.push(obs);
+      }
+    }
+
+    // Ordenar replies cronologicamente (mais antigo primeiro)
+    map.forEach((replies, key) => {
+      map.set(
+        key,
+        replies.sort(
+          (a: Observacao, b: Observacao) =>
+            new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime()
+        )
+      );
+    });
+
+    // Ordenar raízes: importantes primeiro, depois cronológica reversa
+    const importantes = roots
       .filter((o) => o.is_important)
       .sort(
         (a, b) =>
           new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
       );
 
-    const normais = observacoes
+    const normais = roots
       .filter((o) => !o.is_important)
       .sort(
         (a, b) =>
           new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
       );
 
-    return [...importantes, ...normais];
+    return {
+      rootObservacoes: [...importantes, ...normais],
+      repliesMap: map,
+    };
   }, [observacoes]);
 
   const handleDeleteRequest = useCallback((obs: Observacao) => {
     setDeleteObs(obs);
+    setDeleteMotivo('');
     setDeleteOpen(true);
   }, []);
 
   const handleDeleteClose = useCallback((open: boolean) => {
     setDeleteOpen(open);
-    if (!open) setDeleteObs(null);
+    if (!open) {
+      setDeleteObs(null);
+      setDeleteMotivo('');
+    }
   }, []);
 
-  function onDeleteSubmit(data: DeleteFormData) {
-    if (!deleteObs) return;
+  const motivoTooShort = deleteMotivo.trim().length < 10;
+  const motivoTooLong = deleteMotivo.length > 500;
 
-    const parsed = deleteSchema.safeParse(data);
-    if (!parsed.success) return;
+  const handleDeleteConfirm = useCallback(() => {
+    if (!deleteObs || motivoTooShort || motivoTooLong) return;
 
     deleteMutation.mutate(
-      { id: deleteObs.id, motivo: parsed.data.motivo },
+      { id: deleteObs.id, motivo: deleteMotivo.trim() },
       {
         onSuccess: () => handleDeleteClose(false),
       }
     );
-  }
+  }, [deleteObs, deleteMotivo, motivoTooShort, motivoTooLong, deleteMutation, handleDeleteClose]);
 
   if (isLoading) {
     return (
@@ -121,7 +151,7 @@ export function ObservacaoList({ source, id }: ObservacaoListProps) {
     <div className="space-y-4">
       {canEdit && <ObservacaoForm source={source} id={id} />}
 
-      {sorted.length === 0 ? (
+      {rootObservacoes.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-border/50 bg-card/50 py-12">
           <MessageSquareOff className="h-10 w-10 text-muted-foreground/40" />
           <div className="text-center">
@@ -137,11 +167,15 @@ export function ObservacaoList({ source, id }: ObservacaoListProps) {
         </div>
       ) : (
         <div className="space-y-3">
-          {sorted.map((obs) => (
+          {rootObservacoes.map((obs) => (
             <ObservacaoCard
               key={obs.id}
               observacao={obs}
+              replies={repliesMap.get(obs.id) ?? []}
+              source={source}
+              protocolId={id}
               onDelete={handleDeleteRequest}
+              onDocClick={handleDocClick}
             />
           ))}
         </div>
@@ -173,10 +207,7 @@ export function ObservacaoList({ source, id }: ObservacaoListProps) {
             </div>
           )}
 
-          <form
-            onSubmit={handleSubmit(onDeleteSubmit)}
-            className="space-y-4"
-          >
+          <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="motivo">
                 Justificativa <span className="text-destructive">*</span>
@@ -185,11 +216,17 @@ export function ObservacaoList({ source, id }: ObservacaoListProps) {
                 id="motivo"
                 placeholder="Informe o motivo da exclusão desta observação..."
                 rows={3}
-                {...register('motivo')}
+                value={deleteMotivo}
+                onChange={(e) => setDeleteMotivo(e.target.value)}
               />
-              {errors.motivo && (
+              {deleteMotivo.length > 0 && motivoTooShort && (
                 <p className="text-sm text-destructive">
-                  {errors.motivo.message}
+                  Justificativa deve ter pelo menos 10 caracteres
+                </p>
+              )}
+              {motivoTooLong && (
+                <p className="text-sm text-destructive">
+                  Justificativa deve ter no máximo 500 caracteres
                 </p>
               )}
             </div>
@@ -204,9 +241,10 @@ export function ObservacaoList({ source, id }: ObservacaoListProps) {
                 Cancelar
               </Button>
               <Button
-                type="submit"
+                type="button"
                 variant="destructive"
-                disabled={deleteMutation.isPending}
+                onClick={handleDeleteConfirm}
+                disabled={motivoTooShort || motivoTooLong || deleteMutation.isPending}
               >
                 {deleteMutation.isPending && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -214,7 +252,7 @@ export function ObservacaoList({ source, id }: ObservacaoListProps) {
                 Excluir
               </Button>
             </DialogFooter>
-          </form>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

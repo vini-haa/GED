@@ -37,6 +37,7 @@ type Admin struct {
 	CriadoPor    pgtype.Text      `json:"criado_por"`
 	CriadoEm     pgtype.Timestamp `json:"criado_em"`
 	AtualizadoEm pgtype.Timestamp `json:"atualizado_em"`
+	Setor        pgtype.Text      `json:"setor"`
 }
 
 type CacheEmailSetor struct {
@@ -88,6 +89,7 @@ type InternalProtocol struct {
 	DeletedAt         pgtype.Timestamptz `json:"deleted_at"`
 	DeletedByEmail    pgtype.Text        `json:"deleted_by_email"`
 	DeleteReason      pgtype.Text        `json:"delete_reason"`
+	Observations      string             `json:"observations"`
 }
 
 type InternalProtocolMovement struct {
@@ -121,6 +123,7 @@ type Observaco struct {
 	ProtocolSource pgtype.Text      `json:"protocol_source"`
 	IsImportant    pgtype.Bool      `json:"is_important"`
 	AutorSetor     pgtype.Text      `json:"autor_setor"`
+	ParentID       pgtype.UUID      `json:"parent_id"`
 }
 
 type ProtocolosInterno struct {

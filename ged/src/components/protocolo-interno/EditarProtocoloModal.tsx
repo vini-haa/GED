@@ -24,14 +24,6 @@ const schema = z.object({
     .string()
     .min(5, 'Assunto deve ter pelo menos 5 caracteres')
     .max(200, 'Assunto deve ter no maximo 200 caracteres'),
-  interested: z
-    .string()
-    .min(1, 'Interessado e obrigatorio')
-    .max(200, 'Interessado deve ter no maximo 200 caracteres'),
-  sender: z
-    .string()
-    .min(1, 'Remetente e obrigatorio')
-    .max(200, 'Remetente deve ter no maximo 200 caracteres'),
   project_name: z
     .string()
     .max(200, 'Nome do projeto deve ter no maximo 200 caracteres')
@@ -62,8 +54,6 @@ export function EditarProtocoloModal({
   } = useForm<FormData>({
     defaultValues: {
       subject: protocolo.subject,
-      interested: protocolo.interested,
-      sender: protocolo.sender,
       project_name: protocolo.project_name ?? '',
     },
   });
@@ -72,8 +62,6 @@ export function EditarProtocoloModal({
     if (open) {
       reset({
         subject: protocolo.subject,
-        interested: protocolo.interested,
-        sender: protocolo.sender,
         project_name: protocolo.project_name ?? '',
       });
     }
@@ -88,8 +76,6 @@ export function EditarProtocoloModal({
         id: protocolo.id,
         data: {
           subject: parsed.data.subject,
-          interested: parsed.data.interested,
-          sender: parsed.data.sender,
           project_name: parsed.data.project_name,
         },
       },
@@ -131,40 +117,6 @@ export function EditarProtocoloModal({
             {errors.subject && (
               <p className="text-sm text-destructive">
                 {errors.subject.message}
-              </p>
-            )}
-          </div>
-
-          {/* Interessado */}
-          <div className="space-y-2">
-            <Label htmlFor="edit-interested">
-              Interessado <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="edit-interested"
-              placeholder="Nome do interessado..."
-              {...register('interested')}
-            />
-            {errors.interested && (
-              <p className="text-sm text-destructive">
-                {errors.interested.message}
-              </p>
-            )}
-          </div>
-
-          {/* Remetente */}
-          <div className="space-y-2">
-            <Label htmlFor="edit-sender">
-              Remetente <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="edit-sender"
-              placeholder="Nome do remetente..."
-              {...register('sender')}
-            />
-            {errors.sender && (
-              <p className="text-sm text-destructive">
-                {errors.sender.message}
               </p>
             )}
           </div>

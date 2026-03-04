@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { format, formatDistanceToNow } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { formatDateTime, parseLocalDate } from '@/lib/date-utils';
 import {
   Search,
   ScrollText,
@@ -96,7 +95,8 @@ const PERIOD_OPTIONS = [
 
 function isWithinPeriod(dateStr: string, period: string): boolean {
   if (period === 'all') return true;
-  const date = new Date(dateStr);
+  const date = parseLocalDate(dateStr);
+  if (!date) return true;
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffH = diffMs / (1000 * 60 * 60);
@@ -337,19 +337,7 @@ function LogRow({ log, isExpanded, onToggle }: LogRowProps) {
           {log.setor}
         </TableCell>
         <TableCell className="text-sm text-muted-foreground">
-          <div>
-            <p>
-              {formatDistanceToNow(new Date(log.criadoEm), {
-                addSuffix: true,
-                locale: ptBR,
-              })}
-            </p>
-            <p className="text-xs">
-              {format(new Date(log.criadoEm), "dd/MM/yy HH:mm", {
-                locale: ptBR,
-              })}
-            </p>
-          </div>
+          {formatDateTime(log.criadoEm)}
         </TableCell>
       </TableRow>
 

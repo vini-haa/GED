@@ -136,7 +136,7 @@ export function GlobalSearchBar() {
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground truncate">
-                      {item.assunto || 'Sem assunto'} — {item.nome_interessado || '—'}
+                      {item.assunto || 'Sem assunto'}
                     </p>
                     {item.highlight && (
                       <p className="text-xs text-muted-foreground/70 truncate mt-0.5 italic">

@@ -3,8 +3,9 @@ INSERT INTO internal_protocols (
     protocol_number, year, sequence,
     subject, interested, sender, project_name,
     current_sector_code, current_sector_name,
-    created_by_id, created_by_email, created_by_name
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    created_by_id, created_by_email, created_by_name,
+    observations
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 RETURNING *;
 
 -- name: GetInternalProtocolByID :one
@@ -15,6 +16,15 @@ SELECT * FROM internal_protocols
 WHERE is_deleted = FALSE
   AND (sqlc.narg('sector_code')::INTEGER IS NULL OR current_sector_code = sqlc.narg('sector_code'))
   AND (sqlc.narg('status')::VARCHAR IS NULL OR status = sqlc.narg('status'))
+  AND (sqlc.narg('search')::VARCHAR IS NULL OR (
+    subject ILIKE '%' || sqlc.narg('search') || '%'
+    OR protocol_number ILIKE '%' || sqlc.narg('search') || '%'
+    OR interested ILIKE '%' || sqlc.narg('search') || '%'
+    OR project_name ILIKE '%' || sqlc.narg('search') || '%'
+    OR current_sector_name ILIKE '%' || sqlc.narg('search') || '%'
+    OR observations ILIKE '%' || sqlc.narg('search') || '%'
+  ))
+  AND (sqlc.narg('project_name')::VARCHAR IS NULL OR project_name ILIKE '%' || sqlc.narg('project_name') || '%')
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2;
 
@@ -22,14 +32,24 @@ LIMIT $1 OFFSET $2;
 SELECT COUNT(*) FROM internal_protocols
 WHERE is_deleted = FALSE
   AND (sqlc.narg('sector_code')::INTEGER IS NULL OR current_sector_code = sqlc.narg('sector_code'))
-  AND (sqlc.narg('status')::VARCHAR IS NULL OR status = sqlc.narg('status'));
+  AND (sqlc.narg('status')::VARCHAR IS NULL OR status = sqlc.narg('status'))
+  AND (sqlc.narg('search')::VARCHAR IS NULL OR (
+    subject ILIKE '%' || sqlc.narg('search') || '%'
+    OR protocol_number ILIKE '%' || sqlc.narg('search') || '%'
+    OR interested ILIKE '%' || sqlc.narg('search') || '%'
+    OR project_name ILIKE '%' || sqlc.narg('search') || '%'
+    OR current_sector_name ILIKE '%' || sqlc.narg('search') || '%'
+    OR observations ILIKE '%' || sqlc.narg('search') || '%'
+  ))
+  AND (sqlc.narg('project_name')::VARCHAR IS NULL OR project_name ILIKE '%' || sqlc.narg('project_name') || '%');
 
 -- name: UpdateInternalProtocol :one
 UPDATE internal_protocols
 SET subject = COALESCE(sqlc.narg('subject'), subject),
     interested = COALESCE(sqlc.narg('interested'), interested),
     sender = COALESCE(sqlc.narg('sender'), sender),
-    project_name = COALESCE(sqlc.narg('project_name'), project_name)
+    project_name = COALESCE(sqlc.narg('project_name'), project_name),
+    observations = COALESCE(sqlc.narg('observations'), observations)
 WHERE id = $1 AND is_deleted = FALSE
 RETURNING *;
 

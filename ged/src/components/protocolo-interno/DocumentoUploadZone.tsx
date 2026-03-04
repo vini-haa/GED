@@ -254,17 +254,16 @@ export function DocumentoUploadZone({
 
                   {item.status !== 'error' && (
                     <Select
-                      value={item.tipoDocumentoId ?? 'none'}
+                      value={item.tipoDocumentoId ?? ''}
                       onValueChange={(v) =>
-                        updateFileType(item.id, v === 'none' ? null : v)
+                        updateFileType(item.id, v || null)
                       }
                       disabled={disabled}
                     >
-                      <SelectTrigger className="h-8 w-36 text-xs shrink-0">
-                        <SelectValue placeholder="Tipo" />
+                      <SelectTrigger className={`h-8 w-36 text-xs shrink-0 ${!item.tipoDocumentoId ? 'border-destructive' : ''}`}>
+                        <SelectValue placeholder="Selecione..." />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">Sem tipo</SelectItem>
                         {activeTypes.map((dt) => (
                           <SelectItem key={dt.id} value={dt.id}>
                             {dt.name}

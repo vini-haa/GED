@@ -1,9 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { ArrowLeft, Calendar, Building2, FolderKanban, FileText, MapPin, User } from 'lucide-react';
+import { formatDateTime } from '@/lib/date-utils';
+import { ArrowLeft, Calendar, Building2, FolderKanban, FileText, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { ProtocoloDetalhe } from '@/lib/types';
@@ -27,13 +26,7 @@ interface ProtocoloDetailsProps {
 export function ProtocoloDetails({ protocol }: ProtocoloDetailsProps) {
   const router = useRouter();
 
-  const dataFormatada = protocol.data_criacao
-    ? format(
-        new Date(protocol.data_criacao),
-        "dd/MM/yyyy 'às' HH:mm",
-        { locale: ptBR }
-      )
-    : '—';
+  const dataFormatada = formatDateTime(protocol.data_criacao);
 
   return (
     <div className="space-y-4">
@@ -83,16 +76,6 @@ export function ProtocoloDetails({ protocol }: ProtocoloDetailsProps) {
             </div>
             <p className="text-sm font-medium">
               {formatSectorName(protocol.nome_setor_atual)}
-            </p>
-          </div>
-
-          <div className="space-y-1">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <User className="h-3.5 w-3.5" />
-              Interessado
-            </div>
-            <p className="text-sm font-medium">
-              {protocol.nome_interessado ?? '—'}
             </p>
           </div>
 

@@ -1,8 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { formatDateTime, parseLocalDate } from '@/lib/date-utils';
 import { ArrowRight, Clock, MapPin, Route, BarChart3 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -87,14 +88,12 @@ export function TramitacaoTimeline({
             </p>
             {setorAtual.desde && (
               <p className="text-xs text-muted-foreground">
-                Há{' '}
-                {formatDistanceToNow(new Date(setorAtual.desde), {
-                  locale: ptBR,
-                })}{' '}
-                — desde{' '}
-                {format(new Date(setorAtual.desde), "dd/MM/yyyy 'às' HH:mm", {
-                  locale: ptBR,
-                })}
+                {(() => {
+                  const d = parseLocalDate(setorAtual.desde);
+                  return d
+                    ? `Há ${formatDistanceToNow(d, { locale: ptBR })} — desde ${formatDateTime(setorAtual.desde)}`
+                    : '—';
+                })()}
               </p>
             )}
           </div>
@@ -181,11 +180,7 @@ export function TramitacaoTimeline({
                   <div className="mt-2 flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
                     {item.data_movimentacao && (
                       <span>
-                        {format(
-                          new Date(item.data_movimentacao),
-                          "dd/MM/yyyy 'às' HH:mm",
-                          { locale: ptBR }
-                        )}
+                        {formatDateTime(item.data_movimentacao)}
                       </span>
                     )}
                     <span className="flex items-center gap-1">

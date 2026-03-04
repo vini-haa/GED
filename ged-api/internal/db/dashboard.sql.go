@@ -105,6 +105,42 @@ func (q *Queries) DashboardProtocolosComDocs(ctx context.Context) ([]string, err
 	return items, nil
 }
 
+const dashboardProtocolosInternosPorDia = `-- name: DashboardProtocolosInternosPorDia :many
+SELECT
+    TO_CHAR(created_at, 'YYYY-MM-DD') AS data,
+    COUNT(*) AS total
+FROM internal_protocols
+WHERE is_deleted = FALSE
+  AND created_at >= $1
+GROUP BY TO_CHAR(created_at, 'YYYY-MM-DD')
+ORDER BY data
+`
+
+type DashboardProtocolosInternosPorDiaRow struct {
+	Data  string `json:"data"`
+	Total int64  `json:"total"`
+}
+
+func (q *Queries) DashboardProtocolosInternosPorDia(ctx context.Context, createdAt pgtype.Timestamptz) ([]DashboardProtocolosInternosPorDiaRow, error) {
+	rows, err := q.db.Query(ctx, dashboardProtocolosInternosPorDia, createdAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []DashboardProtocolosInternosPorDiaRow{}
+	for rows.Next() {
+		var i DashboardProtocolosInternosPorDiaRow
+		if err := rows.Scan(&i.Data, &i.Total); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const dashboardRankingUploads = `-- name: DashboardRankingUploads :many
 SELECT
     COALESCE(d.uploaded_by_name, d.uploaded_by) AS nome,
@@ -149,11 +185,10 @@ func (q *Queries) DashboardRankingUploads(ctx context.Context, arg DashboardRank
 	return items, nil
 }
 
-const dashboardUploadsPorPeriodo = `-- name: DashboardUploadsPorPeriodo :many
+const dashboardUploadsPorDia = `-- name: DashboardUploadsPorDia :many
 SELECT
     TO_CHAR(uploaded_at, 'YYYY-MM-DD') AS data,
-    COUNT(*) AS uploads,
-    COUNT(DISTINCT protocolo_sagi) AS protocolos
+    COUNT(*) AS total
 FROM documentos
 WHERE deleted_at IS NULL
   AND uploaded_at >= $1
@@ -161,22 +196,21 @@ GROUP BY TO_CHAR(uploaded_at, 'YYYY-MM-DD')
 ORDER BY data
 `
 
-type DashboardUploadsPorPeriodoRow struct {
-	Data       string `json:"data"`
-	Uploads    int64  `json:"uploads"`
-	Protocolos int64  `json:"protocolos"`
+type DashboardUploadsPorDiaRow struct {
+	Data  string `json:"data"`
+	Total int64  `json:"total"`
 }
 
-func (q *Queries) DashboardUploadsPorPeriodo(ctx context.Context, uploadedAt pgtype.Timestamp) ([]DashboardUploadsPorPeriodoRow, error) {
-	rows, err := q.db.Query(ctx, dashboardUploadsPorPeriodo, uploadedAt)
+func (q *Queries) DashboardUploadsPorDia(ctx context.Context, uploadedAt pgtype.Timestamp) ([]DashboardUploadsPorDiaRow, error) {
+	rows, err := q.db.Query(ctx, dashboardUploadsPorDia, uploadedAt)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []DashboardUploadsPorPeriodoRow{}
+	items := []DashboardUploadsPorDiaRow{}
 	for rows.Next() {
-		var i DashboardUploadsPorPeriodoRow
-		if err := rows.Scan(&i.Data, &i.Uploads, &i.Protocolos); err != nil {
+		var i DashboardUploadsPorDiaRow
+		if err := rows.Scan(&i.Data, &i.Total); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

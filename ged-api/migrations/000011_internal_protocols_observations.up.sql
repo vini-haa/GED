@@ -1,0 +1,1 @@
+ALTER TABLE internal_protocols ADD COLUMN IF NOT EXISTS observations TEXT NOT NULL DEFAULT '';

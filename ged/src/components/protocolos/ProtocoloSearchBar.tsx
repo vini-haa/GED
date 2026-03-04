@@ -8,8 +8,8 @@ import { Search, X } from 'lucide-react';
 interface ProtocoloSearchBarProps {
   value: string;
   onSearch: (value: string) => void;
-  scope: 'meu_setor' | 'todos';
-  onScopeChange: (scope: 'meu_setor' | 'todos') => void;
+  scope?: 'meu_setor' | 'todos';
+  onScopeChange?: (scope: 'meu_setor' | 'todos') => void;
 }
 
 export function ProtocoloSearchBar({
@@ -64,24 +64,26 @@ export function ProtocoloSearchBar({
           </button>
         )}
       </div>
-      <div className="flex items-center gap-1 rounded-lg border border-border/50 p-1">
-        <Button
-          variant={scope === 'meu_setor' ? 'default' : 'ghost'}
-          size="sm"
-          className="h-7 text-xs"
-          onClick={() => onScopeChange('meu_setor')}
-        >
-          Meu Setor
-        </Button>
-        <Button
-          variant={scope === 'todos' ? 'default' : 'ghost'}
-          size="sm"
-          className="h-7 text-xs"
-          onClick={() => onScopeChange('todos')}
-        >
-          Todos
-        </Button>
-      </div>
+      {onScopeChange && (
+        <div className="flex items-center gap-1 rounded-lg border border-border/50 p-1">
+          <Button
+            variant={scope === 'meu_setor' ? 'default' : 'ghost'}
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => onScopeChange('meu_setor')}
+          >
+            Meu Setor
+          </Button>
+          <Button
+            variant={scope === 'todos' ? 'default' : 'ghost'}
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => onScopeChange('todos')}
+          >
+            Todos
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

@@ -69,27 +69,22 @@ func (h *ProtocoloHandler) Counters(c *gin.Context) {
 		setorStr = middleware.GetUserSetor(c)
 	}
 
-	if setorStr == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": gin.H{
-				"code":    "VALIDATION_ERROR",
-				"message": "Parâmetro 'setor' é obrigatório",
-			},
-		})
-		return
+	var setor int
+	if setorStr != "" {
+		var err error
+		setor, err = strconv.Atoi(setorStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": gin.H{
+					"code":    "VALIDATION_ERROR",
+					"message": "Parâmetro 'setor' deve ser um número inteiro",
+				},
+			})
+			return
+		}
 	}
 
-	setor, err := strconv.Atoi(setorStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": gin.H{
-				"code":    "VALIDATION_ERROR",
-				"message": "Parâmetro 'setor' deve ser um número inteiro",
-			},
-		})
-		return
-	}
-
+	// setor=0 significa global (para admins sem setor vinculado)
 	resp, err := h.svc.Counters(c.Request.Context(), setor)
 	if err != nil {
 		log.Error().Err(err).Int("setor", setor).Msg("erro ao obter contadores")

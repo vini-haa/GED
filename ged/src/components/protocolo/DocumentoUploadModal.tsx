@@ -182,6 +182,16 @@ export function DocumentoUploadModal({
     const queued = files.filter((f) => f.status === 'queued');
     if (queued.length === 0) return;
 
+    const withoutType = queued.filter((f) => !f.tipoDocumentoId);
+    if (withoutType.length > 0) {
+      toast({
+        title: 'Tipo obrigatorio',
+        description: `Selecione o tipo de documento para ${withoutType.length === 1 ? 'o arquivo' : 'todos os arquivos'} antes de enviar.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setUploading(true);
     let successCount = 0;
     let errorCount = 0;
@@ -371,17 +381,16 @@ export function DocumentoUploadModal({
 
                     {item.status !== 'error' && item.status !== 'done' && (
                       <Select
-                        value={item.tipoDocumentoId ?? 'none'}
+                        value={item.tipoDocumentoId ?? ''}
                         onValueChange={(v) =>
-                          updateFileType(item.id, v === 'none' ? null : v)
+                          updateFileType(item.id, v || null)
                         }
                         disabled={uploading}
                       >
-                        <SelectTrigger className="h-8 w-32 text-xs shrink-0">
-                          <SelectValue placeholder="Tipo" />
+                        <SelectTrigger className={`h-8 w-32 text-xs shrink-0 ${!item.tipoDocumentoId ? 'border-destructive' : ''}`}>
+                          <SelectValue placeholder="Selecione..." />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">Sem tipo</SelectItem>
                           {activeTypes.map((dt) => (
                             <SelectItem key={dt.id} value={dt.id}>
                               {dt.name}

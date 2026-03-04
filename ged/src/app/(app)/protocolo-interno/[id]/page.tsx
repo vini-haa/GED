@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { formatDateTime, parseLocalDate } from '@/lib/date-utils';
 import {
   ArrowLeft,
   ArrowRight,
@@ -179,16 +180,6 @@ export default function ProtocoloInternoDetalhesPage({ params }: PageProps) {
         <div className="rounded-xl border border-border/50 bg-card/50 p-4">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <User className="h-3.5 w-3.5" />
-            Interessado
-          </div>
-          <p className="mt-1 text-sm font-medium">
-            {protocolo.interested || '-'}
-          </p>
-        </div>
-
-        <div className="rounded-xl border border-border/50 bg-card/50 p-4">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <User className="h-3.5 w-3.5" />
             Criado por
           </div>
           <p className="mt-1 text-sm font-medium">
@@ -202,34 +193,20 @@ export default function ProtocoloInternoDetalhesPage({ params }: PageProps) {
             Data de Criacao
           </div>
           <p className="mt-1 text-sm font-medium">
-            {protocolo.created_at
-              ? format(new Date(protocolo.created_at), 'dd/MM/yyyy', {
-                  locale: ptBR,
-                })
-              : '-'}
+            {formatDateTime(protocolo.created_at)}
           </p>
         </div>
       </div>
 
       {/* Informacoes adicionais */}
-      {(protocolo.sender || protocolo.project_name) && (
+      {protocolo.project_name && (
         <div className="grid gap-4 sm:grid-cols-2">
-          {protocolo.sender && (
-            <div className="rounded-xl border border-border/50 bg-card/50 p-4">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Remetente
-              </p>
-              <p className="mt-2 text-sm">{protocolo.sender}</p>
-            </div>
-          )}
-          {protocolo.project_name && (
-            <div className="rounded-xl border border-border/50 bg-card/50 p-4">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Projeto
-              </p>
-              <p className="mt-2 text-sm">{protocolo.project_name}</p>
-            </div>
-          )}
+          <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Projeto
+            </p>
+            <p className="mt-2 text-sm">{protocolo.project_name}</p>
+          </div>
         </div>
       )}
 
@@ -246,21 +223,15 @@ export default function ProtocoloInternoDetalhesPage({ params }: PageProps) {
                 {formatSectorName(protocolo.current_sector_name)}
               </span>
             </p>
-            {tramitacoes.length > 0 && tramitacoes[tramitacoes.length - 1].moved_at && (
-              <p className="text-xs text-muted-foreground">
-                Ha{' '}
-                {formatDistanceToNow(
-                  new Date(tramitacoes[tramitacoes.length - 1].moved_at!),
-                  { locale: ptBR }
-                )}{' '}
-                — desde{' '}
-                {format(
-                  new Date(tramitacoes[tramitacoes.length - 1].moved_at!),
-                  "dd/MM/yyyy 'as' HH:mm",
-                  { locale: ptBR }
-                )}
-              </p>
-            )}
+            {tramitacoes.length > 0 && tramitacoes[tramitacoes.length - 1].moved_at && (() => {
+              const d = parseLocalDate(tramitacoes[tramitacoes.length - 1].moved_at!);
+              return d ? (
+                <p className="text-xs text-muted-foreground">
+                  Ha {formatDistanceToNow(d, { locale: ptBR })} — desde{' '}
+                  {formatDateTime(tramitacoes[tramitacoes.length - 1].moved_at!)}
+                </p>
+              ) : null;
+            })()}
           </div>
         </div>
       )}
@@ -378,11 +349,7 @@ export default function ProtocoloInternoDetalhesPage({ params }: PageProps) {
                         <div className="mt-2 flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
                           {item.moved_at && (
                             <span>
-                              {format(
-                                new Date(item.moved_at),
-                                "dd/MM/yyyy 'as' HH:mm",
-                                { locale: ptBR }
-                              )}
+                              {formatDateTime(item.moved_at)}
                             </span>
                           )}
                           <span>·</span>

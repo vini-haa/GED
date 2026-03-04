@@ -149,8 +149,12 @@ func resolveRole(c *gin.Context, queries *db.Queries, email string) (string, str
 	// 1. Verificar tabela admins
 	admin, err := queries.GetAdminByEmail(c.Request.Context(), email)
 	if err == nil {
-		RoleCache.set(email, admin.Role, "")
-		return admin.Role, ""
+		setor := ""
+		if admin.Setor.Valid && admin.Setor.String != "" {
+			setor = admin.Setor.String
+		}
+		RoleCache.set(email, admin.Role, setor)
+		return admin.Role, setor
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
 		log.Error().Err(err).Str("email", email).Msg("auth: erro ao consultar admins")

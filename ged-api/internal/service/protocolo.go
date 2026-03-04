@@ -256,9 +256,15 @@ func (s *ProtocoloService) listInternos(ctx context.Context, q dto.ListProtocolo
 }
 
 // Counters retorna contadores do cabeçalho.
+// Se codSetor=0, retorna contadores globais (para admins sem setor vinculado).
 func (s *ProtocoloService) Counters(ctx context.Context, codSetor int) (*dto.ContadoresResponse, error) {
 	if s.sagiRepo == nil {
 		return nil, fmt.Errorf("SAGI indisponível")
+	}
+
+	// Modo global (admin sem setor)
+	if codSetor == 0 {
+		return s.countersGlobal(ctx)
 	}
 
 	// Total de protocolos no setor
@@ -293,6 +299,37 @@ func (s *ProtocoloService) Counters(ctx context.Context, codSetor int) (*dto.Con
 	}
 
 	protocolosComDocs := int64(len(docCounts))
+	semDocs := totalProtos - protocolosComDocs
+	if semDocs < 0 {
+		semDocs = 0
+	}
+
+	return &dto.ContadoresResponse{
+		TotalProtocolos: totalProtos,
+		SemDocumentos:   semDocs,
+		DocsAnexados:    docsAnexados,
+	}, nil
+}
+
+// countersGlobal retorna contadores globais (sem filtro de setor).
+func (s *ProtocoloService) countersGlobal(ctx context.Context) (*dto.ContadoresResponse, error) {
+	totalProtos, err := s.sagiRepo.CountProtocolosGlobal(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	docsAnexados, err := s.queries.CountDocsGlobal(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("erro ao contar docs globais")
+		docsAnexados = 0
+	}
+
+	protocolosComDocs, err := s.queries.CountProtocolosComDocsGlobal(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("erro ao contar protocolos com docs globais")
+		protocolosComDocs = 0
+	}
+
 	semDocs := totalProtos - protocolosComDocs
 	if semDocs < 0 {
 		semDocs = 0

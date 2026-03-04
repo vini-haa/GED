@@ -31,6 +31,8 @@ interface ProtocoloFiltersProps {
   onOrdenacaoChange?: (value: 'data_criacao' | 'data_chegada_setor') => void;
   onProjetoChange?: (value: string) => void;
   onClear: () => void;
+  isInternos?: boolean;
+  hideSetor?: boolean;
 }
 
 const statusOptions: Array<{ value: string; label: string }> = [
@@ -39,6 +41,15 @@ const statusOptions: Array<{ value: string; label: string }> = [
   { value: 'em_analise', label: 'Em Análise' },
   { value: 'arquivado', label: 'Arquivado' },
   { value: 'finalizado', label: 'Finalizado' },
+  { value: 'cancelado', label: 'Cancelado' },
+];
+
+const statusInternosOptions: Array<{ value: string; label: string }> = [
+  { value: 'all', label: 'Todos os status' },
+  { value: 'aberto', label: 'Aberto' },
+  { value: 'em_analise', label: 'Em Análise' },
+  { value: 'finalizado', label: 'Finalizado' },
+  { value: 'arquivado', label: 'Arquivado' },
   { value: 'cancelado', label: 'Cancelado' },
 ];
 
@@ -65,6 +76,8 @@ export function ProtocoloFilters({
   onOrdenacaoChange,
   onProjetoChange,
   onClear,
+  isInternos,
+  hideSetor,
 }: ProtocoloFiltersProps) {
   const { data: setores } = useSetores();
 
@@ -76,24 +89,26 @@ export function ProtocoloFilters({
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-      <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Select
-          value={periodo}
-          onValueChange={(v) =>
-            onPeriodoChange(v as 'all' | '7d' | '30d' | '90d' | '1y')
-          }
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Periodo" />
-          </SelectTrigger>
-          <SelectContent>
-            {periodoOptions.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className={`grid flex-1 gap-3 sm:grid-cols-2 ${isInternos || hideSetor ? 'lg:grid-cols-3' : 'lg:grid-cols-4'}`}>
+        {!isInternos && (
+          <Select
+            value={periodo}
+            onValueChange={(v) =>
+              onPeriodoChange(v as 'all' | '7d' | '30d' | '90d' | '1y')
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Periodo" />
+            </SelectTrigger>
+            <SelectContent>
+              {periodoOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         <Select
           value={status}
@@ -103,7 +118,7 @@ export function ProtocoloFilters({
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
-            {statusOptions.map((opt) => (
+            {(isInternos ? statusInternosOptions : statusOptions).map((opt) => (
               <SelectItem key={opt.value} value={opt.value}>
                 {opt.label}
               </SelectItem>
@@ -111,24 +126,26 @@ export function ProtocoloFilters({
           </SelectContent>
         </Select>
 
-        <Select
-          value={setor === 'all' ? 'all' : String(setor)}
-          onValueChange={(v) =>
-            onSetorChange(v === 'all' ? 'all' : Number(v))
-          }
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Setor" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os setores</SelectItem>
-            {setores?.map((s) => (
-              <SelectItem key={s.codigo} value={String(s.codigo)}>
-                {s.descricao}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {!hideSetor && (
+          <Select
+            value={setor === 'all' ? 'all' : String(setor)}
+            onValueChange={(v) =>
+              onSetorChange(v === 'all' ? 'all' : Number(v))
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Setor" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os setores</SelectItem>
+              {setores?.map((s) => (
+                <SelectItem key={s.codigo} value={String(s.codigo)}>
+                  {s.descricao}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         <div className="relative">
           <FolderKanban className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
