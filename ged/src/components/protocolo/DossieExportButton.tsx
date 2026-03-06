@@ -63,7 +63,7 @@ export function DossieExportButton({
       setProgress(85);
 
       const contentDisposition = response.headers.get('Content-Disposition');
-      let fileName = `dossie_${protocoloSagi.replace(/\./g, '_')}.zip`;
+      let fileName = `dossie_${protocoloSagi.replace(/\./g, '_')}.pdf`;
       if (contentDisposition) {
         const match = contentDisposition.match(/filename="(.+)"/);
         if (match) fileName = match[1];

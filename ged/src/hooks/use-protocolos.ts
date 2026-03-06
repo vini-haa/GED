@@ -41,7 +41,8 @@ async function fetchProtocolos(
 }
 
 async function fetchProtocoloCounters(setor: number): Promise<ProtocolCounters> {
-  return apiClient.get<ProtocolCounters>(`/protocolos/contadores?setor=${setor}`);
+  const resp = await apiClient.get<{ data: ProtocolCounters }>(`/protocolos/contadores?setor=${setor}`);
+  return resp.data;
 }
 
 async function fetchSetores(): Promise<Setor[]> {
@@ -50,7 +51,8 @@ async function fetchSetores(): Promise<Setor[]> {
 }
 
 async function fetchRecentes(limit: number = 10): Promise<Protocol[]> {
-  return apiClient.get<Protocol[]>(`/user/recentes?limit=${limit}`);
+  const resp = await apiClient.get<PaginatedResult<Protocol>>(`/user/recentes?limit=${limit}`);
+  return resp.data;
 }
 
 // ============================================
@@ -61,6 +63,8 @@ export function useProtocolos(filters: ProtocolFilters) {
   return useQuery({
     queryKey: ['protocolos', filters],
     queryFn: () => fetchProtocolos(filters),
+    // Não buscar quando tab é "recentes" (usa useRecentes) ou "internos" (usa useProtocolosInternos)
+    enabled: filters.tab !== 'recentes' && filters.tab !== 'internos',
   });
 }
 
@@ -85,6 +89,7 @@ export function useRecentes(limit: number = 10) {
   return useQuery({
     queryKey: ['recentes', limit],
     queryFn: () => fetchRecentes(limit),
+    enabled: limit > 0,
   });
 }
 

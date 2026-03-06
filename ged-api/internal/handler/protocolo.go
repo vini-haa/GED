@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
@@ -135,7 +137,9 @@ func (h *ProtocoloHandler) GetByID(c *gin.Context) {
 	// Registrar acesso recente (fire-and-forget)
 	email := middleware.GetUserEmail(c)
 	go func() {
-		if trackErr := h.svc.TrackRecentView(c.Copy().Request.Context(), email, id, source); trackErr != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if trackErr := h.svc.TrackRecentView(ctx, email, id, source); trackErr != nil {
 			log.Error().Err(trackErr).Str("email", email).Msg("erro ao registrar acesso recente")
 		}
 	}()

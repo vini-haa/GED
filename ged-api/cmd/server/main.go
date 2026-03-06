@@ -120,7 +120,7 @@ func main() {
 	dashboardService := service.NewDashboardService(queries, sagi, setorRepo)
 
 	// Download em Lote e Dossiê
-	downloadService := service.NewDownloadService(queries, driveSvc, documentoService, protocoloService, observacaoService, tramitacaoService, activityLogService)
+	downloadService := service.NewDownloadService(queries, driveSvc, documentoService, protocoloService, observacaoService, tramitacaoService, internalProtocolService, activityLogService)
 
 	// Router
 	r := gin.New()
@@ -146,7 +146,7 @@ func main() {
 	// Admin handlers
 	adminHandler := handler.NewAdminHandler(queries, setorRepo, activityLogService)
 	tipoDocHandler := handler.NewTipoDocumentoHandler(queries, activityLogService)
-	activityLogHandler := handler.NewActivityLogHandler(queries)
+	activityLogHandler := handler.NewActivityLogHandler(queries, setorRepo)
 
 	// Handlers de autenticação
 	authHandler := handler.NewAuthHandler(cfg.NextAuthSecret)

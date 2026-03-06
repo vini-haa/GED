@@ -15,6 +15,10 @@ type TramitacaoSAGI struct {
 	SetorDestino     string
 	Situacao         string
 	RegAtual         bool
+	UsuarioEnvio     string
+	UsuarioRecebimento string
+	DataRecebimento  *time.Time
+	Observacao       string
 }
 
 // SAGITramitacaoRepository acessa tramitações/movimentações do SAGI.
@@ -39,11 +43,17 @@ SELECT
     ISNULL(CASE WHEN setor_origem.DESCR LIKE '- %' THEN SUBSTRING(setor_origem.DESCR, 3, LEN(setor_origem.DESCR)) ELSE setor_origem.DESCR END, '') COLLATE Latin1_General_CI_AI AS setor_origem,
     ISNULL(CASE WHEN setor_destino.DESCR LIKE '- %' THEN SUBSTRING(setor_destino.DESCR, 3, LEN(setor_destino.DESCR)) ELSE setor_destino.DESCR END, '') COLLATE Latin1_General_CI_AI AS setor_destino,
     ISNULL(sp.Descricao, '') COLLATE Latin1_General_CI_AI AS situacao,
-    ISNULL(sm.RegAtual, 0) AS reg_atual
+    ISNULL(sm.RegAtual, 0) AS reg_atual,
+    ISNULL(u_env.Nome COLLATE Latin1_General_CI_AI, '') AS usuario_envio,
+    ISNULL(u_rec.Nome COLLATE Latin1_General_CI_AI, '') AS usuario_recebimento,
+    sm.dtRecebimento AS data_recebimento,
+    ISNULL(sm.obs COLLATE Latin1_General_CI_AI, '') AS observacao
 FROM scd_movimentacao sm
 LEFT JOIN SETOR setor_origem ON setor_origem.CODIGO = sm.codSetorOrigem
 LEFT JOIN SETOR setor_destino ON setor_destino.CODIGO = sm.codSetorDestino
 LEFT JOIN SituacaoProtocolo sp ON sp.Codigo = sm.codSituacaoProt
+LEFT JOIN Usuario u_env ON u_env.Codigo = sm.codUsuario
+LEFT JOIN Usuario u_rec ON u_rec.Codigo = sm.CodUsuRec
 WHERE sm.CodProt = @pProtocolID
   AND (sm.Deletado IS NULL OR sm.Deletado = 0)
 ORDER BY sm.codigo DESC`
@@ -68,6 +78,10 @@ ORDER BY sm.codigo DESC`
 			&t.SetorDestino,
 			&t.Situacao,
 			&t.RegAtual,
+			&t.UsuarioEnvio,
+			&t.UsuarioRecebimento,
+			&t.DataRecebimento,
+			&t.Observacao,
 		); err != nil {
 			return nil, fmt.Errorf("erro ao escanear tramitação: %w", err)
 		}

@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { formatDateTime } from '@/lib/date-utils';
-import { ArrowLeft, Calendar, Building2, FolderKanban, FileText, MapPin } from 'lucide-react';
+import { ArrowLeft, Calendar, Building2, FolderKanban, FileText, User, CreditCard, Clock, MessageSquareText, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { ProtocoloDetalhe } from '@/lib/types';
@@ -95,12 +95,72 @@ export function ProtocoloDetails({ protocol }: ProtocoloDetailsProps) {
               <p className="text-sm font-medium">{protocol.codigo_convenio}</p>
             </div>
           )}
+
+          {protocol.interessado && (
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <User className="h-3.5 w-3.5" />
+                Interessado
+              </div>
+              <p className="text-sm font-medium">{protocol.interessado}</p>
+            </div>
+          )}
+
+          {protocol.usuario_cadastro && (
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <User className="h-3.5 w-3.5" />
+                Cadastrado por
+              </div>
+              <p className="text-sm font-medium">{protocol.usuario_cadastro}</p>
+            </div>
+          )}
+
+          {protocol.conta_corrente && (
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <CreditCard className="h-3.5 w-3.5" />
+                Conta Corrente
+              </div>
+              <p className="text-sm font-medium font-mono">{protocol.conta_corrente}</p>
+            </div>
+          )}
+
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Clock className="h-3.5 w-3.5" />
+              Dias s/ Movimentação
+            </div>
+            <p className="text-sm font-medium">
+              {protocol.dias_ultima_movimentacao === 0
+                ? 'Menos de 1 dia'
+                : `${protocol.dias_ultima_movimentacao} dias`}
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Info className="h-3.5 w-3.5" />
+              Situação
+            </div>
+            <p className="text-sm font-medium">{protocol.situacao || protocol.status}</p>
+          </div>
         </div>
 
         {protocol.assunto && (
           <div className="mt-4 border-t border-border/30 pt-4">
             <p className="text-xs text-muted-foreground">Assunto</p>
             <p className="mt-1 text-sm">{protocol.assunto}</p>
+          </div>
+        )}
+
+        {protocol.observacao && (
+          <div className="mt-4 border-t border-border/30 pt-4">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <MessageSquareText className="h-3.5 w-3.5" />
+              Observação do Cadastro
+            </div>
+            <p className="mt-1 text-sm whitespace-pre-line">{protocol.observacao}</p>
           </div>
         )}
       </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { formatDateTime } from '@/lib/date-utils';
 import {
   FileText,
@@ -108,6 +108,10 @@ function PreviewContent({ documento }: { documento: Documento }) {
   );
 }
 
+const MIN_WIDTH = 320;
+const MAX_WIDTH_RATIO = 0.85;
+const DEFAULT_WIDTH = 512; // sm:max-w-lg = 32rem = 512px
+
 interface DocumentoViewerProps {
   documento: Documento | null;
   open: boolean;
@@ -123,6 +127,43 @@ export function DocumentoViewer({
 }: DocumentoViewerProps) {
   const { canDelete } = usePermissions();
   const downloadMutation = useDownloadDocumento();
+  const [width, setWidth] = useState(DEFAULT_WIDTH);
+  const isDragging = useRef(false);
+  const startX = useRef(0);
+  const startWidth = useRef(0);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDragging.current = true;
+    startX.current = e.clientX;
+    startWidth.current = width;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [width]);
+
+  useEffect(() => {
+    function handleMouseMove(e: MouseEvent) {
+      if (!isDragging.current) return;
+      const delta = startX.current - e.clientX;
+      const maxWidth = window.innerWidth * MAX_WIDTH_RATIO;
+      const newWidth = Math.min(maxWidth, Math.max(MIN_WIDTH, startWidth.current + delta));
+      setWidth(newWidth);
+    }
+
+    function handleMouseUp() {
+      if (!isDragging.current) return;
+      isDragging.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
 
   if (!documento) return null;
 
@@ -154,91 +195,104 @@ export function DocumentoViewer({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-lg">
-        <SheetHeader>
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted/50">
-              <Icon className="h-5 w-5 text-muted-foreground" />
+      <SheetContent
+        side="right"
+        className="p-0"
+        style={{ width: `${width}px`, maxWidth: `${width}px` }}
+      >
+        {/* Resize handle */}
+        <div
+          onMouseDown={handleMouseDown}
+          className="absolute left-0 top-0 bottom-0 z-50 w-1.5 cursor-col-resize hover:bg-primary/20 active:bg-primary/30 transition-colors"
+          title="Arrastar para redimensionar"
+        />
+
+        <div className="p-6 h-full">
+          <SheetHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted/50">
+                <Icon className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <SheetTitle className="text-left text-sm leading-tight">
+                {documento.nome_arquivo}
+              </SheetTitle>
             </div>
-            <SheetTitle className="text-left text-sm leading-tight">
-              {documento.nome_arquivo}
-            </SheetTitle>
-          </div>
-        </SheetHeader>
+          </SheetHeader>
 
-        <ScrollArea className="mt-6 h-[calc(100vh-10rem)]">
-          <div className="space-y-6 pr-4">
-            <PreviewContent documento={documento} />
+          <ScrollArea className="mt-6 h-[calc(100vh-10rem)]">
+            <div className="space-y-6 pr-4">
+              <PreviewContent documento={documento} />
 
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold">Metadados</h3>
-              <div className="rounded-lg border border-border/50 divide-y divide-border/30">
-                {documento.tipo_documento_nome && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold">Metadados</h3>
+                <div className="rounded-lg border border-border/50 divide-y divide-border/30">
+                  {documento.tipo_documento_nome && (
+                    <div className="flex items-center justify-between px-3 py-2.5">
+                      <span className="text-xs text-muted-foreground">Tipo</span>
+                      <Badge variant="outline" className="text-xs">
+                        {documento.tipo_documento_nome}
+                      </Badge>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between px-3 py-2.5">
-                    <span className="text-xs text-muted-foreground">Tipo</span>
-                    <Badge variant="outline" className="text-xs">
-                      {documento.tipo_documento_nome}
-                    </Badge>
+                    <span className="text-xs text-muted-foreground">Tamanho</span>
+                    <span className="text-sm">{formatFileSize(documento.tamanho_bytes)}</span>
                   </div>
-                )}
-                <div className="flex items-center justify-between px-3 py-2.5">
-                  <span className="text-xs text-muted-foreground">Tamanho</span>
-                  <span className="text-sm">{formatFileSize(documento.tamanho_bytes)}</span>
-                </div>
-                <div className="flex items-center justify-between px-3 py-2.5">
-                  <span className="text-xs text-muted-foreground">Formato</span>
-                  <span className="text-sm">{documento.mime_type ?? '—'}</span>
-                </div>
-                <div className="flex items-center justify-between px-3 py-2.5">
-                  <span className="text-xs text-muted-foreground">Upload em</span>
-                  <span className="text-sm">{dataUpload}</span>
-                </div>
-                <div className="flex items-center justify-between px-3 py-2.5">
-                  <span className="text-xs text-muted-foreground">Enviado por</span>
-                  <span className="text-sm">{documento.uploaded_by_name}</span>
+                  <div className="flex items-center justify-between px-3 py-2.5">
+                    <span className="text-xs text-muted-foreground">Formato</span>
+                    <span className="text-sm">{documento.mime_type ?? '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between px-3 py-2.5">
+                    <span className="text-xs text-muted-foreground">Upload em</span>
+                    <span className="text-sm">{dataUpload}</span>
+                  </div>
+                  <div className="flex items-center justify-between px-3 py-2.5">
+                    <span className="text-xs text-muted-foreground">Enviado por</span>
+                    <span className="text-sm">{documento.uploaded_by_name}</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {documento.drive_file_url && (
-              <a
-                href={documento.drive_file_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-                Abrir no Google Drive
-              </a>
-            )}
-
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={handleDownload}
-                disabled={downloadMutation.isPending}
-              >
-                {downloadMutation.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="mr-2 h-4 w-4" />
-                )}
-                Baixar
-              </Button>
-              {canDelete && onDelete && (
-                <Button
-                  variant="destructive"
-                  className="flex-1"
-                  onClick={() => onDelete(documento)}
+              {documento.drive_file_url && (
+                <a
+                  href={documento.drive_file_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Excluir
-                </Button>
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Abrir no Google Drive
+                </a>
               )}
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={handleDownload}
+                  disabled={downloadMutation.isPending}
+                >
+                  {downloadMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="mr-2 h-4 w-4" />
+                  )}
+                  Baixar
+                </Button>
+                {canDelete && onDelete && (
+                  <Button
+                    variant="destructive"
+                    className="flex-1"
+                    onClick={() => onDelete(documento)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Excluir
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
-        </ScrollArea>
+          </ScrollArea>
+        </div>
       </SheetContent>
     </Sheet>
   );

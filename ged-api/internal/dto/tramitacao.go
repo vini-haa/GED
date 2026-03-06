@@ -4,13 +4,17 @@ import "time"
 
 // TramitacaoItem é o DTO de resposta para uma movimentação/tramitação SAGI.
 type TramitacaoItem struct {
-	Sequencia        int        `json:"sequencia"`
-	DataMovimentacao *time.Time `json:"data_movimentacao"`
-	SetorOrigem      string     `json:"setor_origem"`
-	SetorDestino     string     `json:"setor_destino"`
-	Situacao         string     `json:"situacao"`
-	RegAtual         bool       `json:"reg_atual"`
-	PermanenciaDias  int        `json:"permanencia_dias"`
+	Sequencia          int        `json:"sequencia"`
+	DataMovimentacao   *time.Time `json:"data_movimentacao"`
+	SetorOrigem        string     `json:"setor_origem"`
+	SetorDestino       string     `json:"setor_destino"`
+	Situacao           string     `json:"situacao"`
+	RegAtual           bool       `json:"reg_atual"`
+	PermanenciaDias    int        `json:"permanencia_dias"`
+	UsuarioEnvio       string     `json:"usuario_envio"`
+	UsuarioRecebimento string     `json:"usuario_recebimento"`
+	DataRecebimento    *time.Time `json:"data_recebimento"`
+	Observacao         string     `json:"observacao"`
 }
 
 // TramitacaoResumo é o resumo estatístico da tramitação.

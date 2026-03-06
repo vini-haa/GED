@@ -21,13 +21,14 @@ const maxZipDocs = 50
 
 // DownloadService gerencia download em lote e geração de dossiê.
 type DownloadService struct {
-	queries      *db.Queries
-	driveSvc     *DriveService
-	docSvc       *DocumentoService
-	protocoloSvc *ProtocoloService
-	observacaoSvc *ObservacaoService
-	tramitacaoSvc *TramitacaoService
-	activitySvc  *ActivityLogService
+	queries          *db.Queries
+	driveSvc         *DriveService
+	docSvc           *DocumentoService
+	protocoloSvc     *ProtocoloService
+	observacaoSvc    *ObservacaoService
+	tramitacaoSvc    *TramitacaoService
+	internalProtoSvc *InternalProtocolService
+	activitySvc      *ActivityLogService
 }
 
 // NewDownloadService cria uma instância do DownloadService.
@@ -38,16 +39,18 @@ func NewDownloadService(
 	protocoloSvc *ProtocoloService,
 	observacaoSvc *ObservacaoService,
 	tramitacaoSvc *TramitacaoService,
+	internalProtoSvc *InternalProtocolService,
 	activitySvc *ActivityLogService,
 ) *DownloadService {
 	return &DownloadService{
-		queries:       queries,
-		driveSvc:      driveSvc,
-		docSvc:        docSvc,
-		protocoloSvc:  protocoloSvc,
-		observacaoSvc: observacaoSvc,
-		tramitacaoSvc: tramitacaoSvc,
-		activitySvc:   activitySvc,
+		queries:          queries,
+		driveSvc:         driveSvc,
+		docSvc:           docSvc,
+		protocoloSvc:     protocoloSvc,
+		observacaoSvc:    observacaoSvc,
+		tramitacaoSvc:    tramitacaoSvc,
+		internalProtoSvc: internalProtoSvc,
+		activitySvc:      activitySvc,
 	}
 }
 
@@ -267,7 +270,7 @@ func (s *DownloadService) DownloadSelected(ctx context.Context, source, id strin
 	return protocoloSagi, count, nil
 }
 
-// GenerateDossie gera o dossiê completo (PDF resumo + documentos) como ZIP.
+// GenerateDossie gera o PDF de resumo do protocolo e escreve no writer.
 func (s *DownloadService) GenerateDossie(ctx context.Context, source, id string, w io.Writer, userEmail, userName, ip, userAgent string) (string, error) {
 	protocoloSagi, err := s.docSvc.ResolveProtocoloSagi(ctx, source, id)
 	if err != nil {
@@ -289,13 +292,41 @@ func (s *DownloadService) GenerateDossie(ctx context.Context, source, id string,
 		observacoes = &dto.ListObservacoesResponse{Data: []dto.ObservacaoItem{}}
 	}
 
-	// Buscar tramitação (apenas SAGI)
+	// Buscar tramitação
 	var tramitacao *dto.TramitacaoResponse
 	if source == "sagi" && protocolID > 0 {
 		tramitacao, err = s.tramitacaoSvc.GetByProtocolo(ctx, protocolID)
 		if err != nil {
-			log.Warn().Err(err).Msg("erro ao buscar tramitação para dossiê, continuando sem")
+			log.Warn().Err(err).Msg("erro ao buscar tramitação SAGI para dossiê, continuando sem")
 			tramitacao = &dto.TramitacaoResponse{Data: []dto.TramitacaoItem{}}
+		}
+	} else if source == "interno" && protocolID > 0 && s.internalProtoSvc != nil {
+		hist, err := s.internalProtoSvc.History(ctx, int32(protocolID))
+		if err != nil {
+			log.Warn().Err(err).Msg("erro ao buscar tramitação interna para dossiê, continuando sem")
+		} else if hist != nil && len(hist.Data) > 0 {
+			items := make([]dto.TramitacaoItem, len(hist.Data))
+			for i, m := range hist.Data {
+				items[i] = dto.TramitacaoItem{
+					Sequencia:        int(m.Sequence),
+					DataMovimentacao: m.MovedAt,
+					SetorOrigem:      m.FromSectorName,
+					SetorDestino:     m.ToSectorName,
+					Situacao:         m.DispatchNote,
+					RegAtual:         m.IsCurrent,
+					PermanenciaDias:  m.Permanencia,
+				}
+			}
+			tramitacao = &dto.TramitacaoResponse{
+				Data:  items,
+				Total: hist.Total,
+				Resumo: dto.TramitacaoResumo{
+					TempoTotalDias:     hist.Resumo.TempoTotalDias,
+					TotalSetores:       hist.Resumo.TotalSetores,
+					SetorMaisLongo:     hist.Resumo.SetorMaisLongo,
+					DiasSetorMaisLongo: hist.Resumo.DiasSetorMaisLongo,
+				},
+			}
 		}
 	}
 
@@ -311,50 +342,9 @@ func (s *DownloadService) GenerateDossie(ctx context.Context, source, id string,
 		return "", fmt.Errorf("erro ao gerar PDF resumo: %w", err)
 	}
 
-	// Criar ZIP com PDF + documentos
-	zipWriter := zip.NewWriter(w)
-	defer zipWriter.Close()
-
-	// Adicionar PDF resumo
-	pdfEntry, err := zipWriter.Create("00_resumo_protocolo.pdf")
-	if err != nil {
-		return "", fmt.Errorf("erro ao criar entrada PDF no ZIP: %w", err)
-	}
-	if _, err := io.Copy(pdfEntry, bytes.NewReader(pdfBuf)); err != nil {
-		return "", fmt.Errorf("erro ao escrever PDF no ZIP: %w", err)
-	}
-
-	// Adicionar documentos
-	if s.driveSvc != nil {
-		usedNames := make(map[string]int)
-		for i, doc := range docs {
-			if !doc.DriveFileID.Valid || doc.DriveFileID.String == "" {
-				continue
-			}
-
-			reader, _, _, err := s.driveSvc.Download(ctx, doc.DriveFileID.String)
-			if err != nil {
-				log.Warn().Err(err).Str("doc_id", doc.ID.String()).Msg("falha ao baixar documento para dossiê")
-				continue
-			}
-
-			// Prefixo numérico para ordenação
-			prefix := fmt.Sprintf("%02d_", i+1)
-			fileName := prefix + uniqueFileName(doc.NomeArquivo, usedNames)
-
-			entry, err := zipWriter.Create(fileName)
-			if err != nil {
-				reader.Close()
-				continue
-			}
-
-			if _, err := io.Copy(entry, reader); err != nil {
-				reader.Close()
-				continue
-			}
-
-			reader.Close()
-		}
+	// Escrever PDF diretamente no writer
+	if _, err := io.Copy(w, bytes.NewReader(pdfBuf)); err != nil {
+		return "", fmt.Errorf("erro ao escrever PDF: %w", err)
 	}
 
 	// Activity log
@@ -369,7 +359,7 @@ func (s *DownloadService) GenerateDossie(ctx context.Context, source, id string,
 		ProtocolID:     protocolID,
 		ProtocolNumber: protocoloSagi,
 		ProtocolSource: source,
-		Details:        map[string]interface{}{"doc_count": len(docs), "format": "dossie_zip"},
+		Details:        map[string]interface{}{"doc_count": len(docs), "format": "pdf"},
 	})
 
 	return protocoloSagi, nil
@@ -411,7 +401,6 @@ func (s *DownloadService) generateSummaryPDF(
 	if proto.CodigoConvenio != "" {
 		addField(pdf, "Convênio:", proto.CodigoConvenio)
 	}
-	addField(pdf, "Interessado:", proto.NomeInteressado)
 	addField(pdf, "Setor Atual:", proto.NomeSetorAtual)
 	addField(pdf, "Status:", proto.Status)
 	addField(pdf, "Documentos:", fmt.Sprintf("%d", proto.DocCount))
@@ -552,13 +541,28 @@ func (s *DownloadService) generateSummaryPDF(
 
 // encode converte string UTF-8 para ISO-8859-1 (Latin1) para o fpdf.
 func encode(s string) string {
-	// fpdf usa ISO-8859-1 por padrão. Fazemos best-effort de conversão.
 	var buf bytes.Buffer
 	for _, r := range s {
 		if r < 256 {
-			buf.WriteRune(r)
+			buf.WriteByte(byte(r))
 		} else {
-			buf.WriteByte('?')
+			// Mapear caracteres Unicode comuns para Latin1
+			switch r {
+			case '\u2013': // en-dash
+				buf.WriteByte('-')
+			case '\u2014': // em-dash
+				buf.WriteByte('-')
+			case '\u2018', '\u2019': // smart quotes single
+				buf.WriteByte('\'')
+			case '\u201C', '\u201D': // smart quotes double
+				buf.WriteByte('"')
+			case '\u2026': // ellipsis
+				buf.WriteString("...")
+			case '\u2022': // bullet
+				buf.WriteByte('*')
+			default:
+				buf.WriteByte('?')
+			}
 		}
 	}
 	return buf.String()

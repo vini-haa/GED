@@ -13,14 +13,26 @@ import (
 
 	"github.com/fadex/ged-api/internal/db"
 	"github.com/fadex/ged-api/internal/dto"
+	"github.com/fadex/ged-api/internal/repository"
 )
 
 type ActivityLogHandler struct {
-	queries *db.Queries
+	queries   *db.Queries
+	setorRepo *repository.SAGISetorRepository
 }
 
-func NewActivityLogHandler(queries *db.Queries) *ActivityLogHandler {
-	return &ActivityLogHandler{queries: queries}
+func NewActivityLogHandler(queries *db.Queries, setorRepo *repository.SAGISetorRepository) *ActivityLogHandler {
+	return &ActivityLogHandler{queries: queries, setorRepo: setorRepo}
+}
+
+func (h *ActivityLogHandler) resolveSetorByEmail(c *gin.Context, email string) string {
+	if h.setorRepo != nil {
+		_, nome, err := h.setorRepo.GetUserSectorCode(c.Request.Context(), email)
+		if err == nil {
+			return nome
+		}
+	}
+	return ""
 }
 
 // List godoc
@@ -88,9 +100,19 @@ func (h *ActivityLogHandler) List(c *gin.Context) {
 
 	total, _ := h.queries.CountActivityLogs(c.Request.Context(), countParams)
 
+	// Cache de email→setor para evitar queries repetidas ao SAGI
+	setorCache := make(map[string]string)
 	items := make([]dto.ActivityLogResponse, len(logs))
 	for i, l := range logs {
-		items[i] = dto.ActivityLogFromDB(l)
+		item := dto.ActivityLogFromDB(l)
+		if setor, ok := setorCache[l.UsuarioEmail]; ok {
+			item.Setor = setor
+		} else {
+			setor = h.resolveSetorByEmail(c, l.UsuarioEmail)
+			setorCache[l.UsuarioEmail] = setor
+			item.Setor = setor
+		}
+		items[i] = item
 	}
 
 	c.JSON(http.StatusOK, gin.H{

@@ -12,17 +12,23 @@ import (
 
 // ProtocoloDocumento representa um protocolo da tabela documento do SAGI.
 type ProtocoloDocumento struct {
-	ID               int        `json:"id"`
-	NumeroProtocolo  string     `json:"numero_protocolo"`
-	DataCriacao      *time.Time `json:"data_criacao"`
-	Assunto          string     `json:"assunto"`
-	NomeProjeto      string     `json:"nome_projeto"`
-	CodigoConvenio   string     `json:"codigo_convenio"`
-	NomeInteressado  string     `json:"nome_interessado"`
-	NomeSetorAtual   string     `json:"nome_setor_atual"`
-	CodSetorAtual    int        `json:"cod_setor_atual"`
-	DataChegadaSetor *time.Time `json:"data_chegada_setor"`
-	Status           string     `json:"status"`
+	ID                   int        `json:"id"`
+	NumeroProtocolo      string     `json:"numero_protocolo"`
+	DataCriacao          *time.Time `json:"data_criacao"`
+	Assunto              string     `json:"assunto"`
+	NomeProjeto          string     `json:"nome_projeto"`
+	CodigoConvenio       string     `json:"codigo_convenio"`
+	NomeInteressado      string     `json:"nome_interessado"`
+	NomeSetorAtual       string     `json:"nome_setor_atual"`
+	CodSetorAtual        int        `json:"cod_setor_atual"`
+	DataChegadaSetor     *time.Time `json:"data_chegada_setor"`
+	Status               string     `json:"status"`
+	Interessado          string     `json:"interessado"`
+	Observacao           string     `json:"observacao"`
+	UsuarioCadastro      string     `json:"usuario_cadastro"`
+	ContaCorrente          string     `json:"conta_corrente"`
+	DiasUltimaMovimentacao int        `json:"dias_ultima_movimentacao"`
+	Situacao               string     `json:"situacao"`
 }
 
 // ProtocoloListFilters encapsula filtros para listagem de protocolos.
@@ -65,14 +71,33 @@ const protocoloDocSelectCols = `
 		WHEN sm.codSituacaoProt = 66 THEN 'Em Análise' COLLATE Latin1_General_CI_AI
 		WHEN setor.DESCR LIKE '%ARQUIVO%' THEN 'Arquivado' COLLATE Latin1_General_CI_AI
 		ELSE 'Em Tramitação' COLLATE Latin1_General_CI_AI
-	END AS status_protocolo`
+	END AS status_protocolo,
+	ISNULL(d.Interessado COLLATE Latin1_General_CI_AI, '') AS interessado,
+	ISNULL(d.obs COLLATE Latin1_General_CI_AI, '') AS observacao,
+	ISNULL(u_cad.Nome COLLATE Latin1_General_CI_AI, '') AS usuario_cadastro,
+	ISNULL(cc.cc, '') AS conta_corrente,
+	CASE WHEN sm.data IS NOT NULL THEN DATEDIFF(DAY, sm.data, GETDATE()) ELSE 0 END AS dias_ultima_movimentacao,
+	ISNULL(sp.descricao COLLATE Latin1_General_CI_AI,
+		CASE
+			WHEN sm.codSituacaoProt = 60 THEN 'Protocolo Arquivado' COLLATE Latin1_General_CI_AI
+			WHEN sm.codSituacaoProt = 64 THEN 'Cancelado' COLLATE Latin1_General_CI_AI
+			WHEN sm.codSituacaoProt = 57 THEN 'Finalizado' COLLATE Latin1_General_CI_AI
+			WHEN sm.codSituacaoProt = 66 THEN 'Em Análise' COLLATE Latin1_General_CI_AI
+			WHEN setor.DESCR LIKE '%ARQUIVO%' THEN 'Protocolo Arquivado' COLLATE Latin1_General_CI_AI
+			ELSE 'Em Tramitação' COLLATE Latin1_General_CI_AI
+		END
+	) AS situacao`
 
 const protocoloDocFromJoins = `
 FROM documento d
 LEFT JOIN scd_movimentacao sm ON sm.CodProt = d.Codigo AND sm.RegAtual = 1
 LEFT JOIN SETOR setor ON setor.CODIGO = sm.codSetorDestino
 LEFT JOIN CONVENIO c ON c.NumConv = d.NumConv
-LEFT JOIN PESSOAS p ON p.codigo = d.CodFornec`
+LEFT JOIN PESSOAS p ON p.codigo = d.CodFornec
+LEFT JOIN Usuario u_cad ON u_cad.Codigo = d.codUsuario
+LEFT JOIN conv_cc ccc ON c.NumConv = ccc.NumConv AND ccc.deletado IS NULL AND ccc.principal = 1
+LEFT JOIN cc ON cc.codigo = ccc.CodCC AND cc.DELETADO IS NULL
+LEFT JOIN situacaoProtocolo sp ON sp.codigo = sm.codSituacaoProt`
 
 // buildProtocoloWhere monta WHERE dinâmico com parâmetros nomeados do SQL Server.
 func buildProtocoloWhere(f ProtocoloListFilters) (string, []interface{}) {
@@ -157,6 +182,12 @@ func scanProtocoloDoc(scanner interface{ Scan(...interface{}) error }) (Protocol
 		&p.CodSetorAtual,
 		&p.DataChegadaSetor,
 		&p.Status,
+		&p.Interessado,
+		&p.Observacao,
+		&p.UsuarioCadastro,
+		&p.ContaCorrente,
+		&p.DiasUltimaMovimentacao,
+		&p.Situacao,
 	)
 	return p, err
 }

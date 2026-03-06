@@ -132,14 +132,21 @@ export function ProtocoloTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.map((protocol) => (
+          {data.map((protocol) => {
+            const detailHref = protocol.is_internal
+              ? `/protocolo-interno/${protocol.internal_id}`
+              : `/protocolo/sagi/${protocol.id}`;
+            const rowKey = protocol.is_internal
+              ? `interno-${protocol.internal_id}`
+              : `sagi-${protocol.id}`;
+            return (
             <TableRow
-              key={protocol.id}
+              key={rowKey}
               className="!border-border/30 hover:!bg-muted/20"
             >
               <TableCell className="font-medium">
                 <Link
-                  href={`/protocolo/sagi/${protocol.id}`}
+                  href={detailHref}
                   className="hover:underline"
                 >
                   {protocol.numero_protocolo}
@@ -195,7 +202,7 @@ export function ProtocoloTable({
                     <DropdownMenuLabel>Acoes</DropdownMenuLabel>
                     <DropdownMenuItem asChild>
                       <Link
-                        href={`/protocolo/sagi/${protocol.id}`}
+                        href={detailHref}
                       >
                         <Eye className="mr-2 h-4 w-4" />
                         Ver Detalhes
@@ -209,7 +216,7 @@ export function ProtocoloTable({
                 </DropdownMenu>
               </TableCell>
             </TableRow>
-          ))}
+          ); })}
         </TableBody>
       </Table>
     </div>

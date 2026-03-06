@@ -8,7 +8,7 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs';
 import { Pagination } from '@/components/shared/Pagination';
-import { useProtocolos } from '@/hooks/use-protocolos';
+import { useProtocolos, useRecentes } from '@/hooks/use-protocolos';
 import { useProtocolosInternos } from '@/hooks/use-protocolos-internos';
 import type { ProtocolFilters, ProtocolTab } from '@/lib/types';
 import {
@@ -54,9 +54,15 @@ export function ProtocoloTabs() {
   );
 
   const isInternos = filters.tab === 'internos';
+  const isRecentes = filters.tab === 'recentes';
 
-  // Hook para protocolos SAGI
+  // Hook para protocolos SAGI (não busca quando tab é recentes ou internos)
   const { data: result, isLoading } = useProtocolos(filters);
+
+  // Hook para protocolos recentes do usuário (visualizados recentemente)
+  const { data: recentesResult, isLoading: recentesLoading } = useRecentes(
+    isRecentes ? 20 : 0
+  );
 
   // Hook para protocolos internos com filtros
   const internosParams = isInternos
@@ -169,19 +175,21 @@ export function ProtocoloTabs() {
     filters.periodo !== 'all' ||
     !!filters.projeto;
 
-  // Paginação: usar resultado correto conforme a aba
-  const paginationData = isInternos
-    ? internosResult
-      ? {
-          page: internosResult.page,
-          total_pages: internosResult.total_pages,
-          total: internosResult.total,
-          page_size: internosResult.per_page,
-        }
-      : null
-    : result
-      ? result.pagination
-      : null;
+  // Paginação: usar resultado correto conforme a aba (recentes não tem paginação)
+  const paginationData = isRecentes
+    ? null
+    : isInternos
+      ? internosResult
+        ? {
+            page: internosResult.page,
+            total_pages: internosResult.total_pages,
+            total: internosResult.total,
+            page_size: internosResult.per_page,
+          }
+        : null
+      : result
+        ? result.pagination
+        : null;
 
   return (
     <div className="space-y-4">
@@ -232,8 +240,17 @@ export function ProtocoloTabs() {
           />
         </TabsContent>
 
+        <TabsContent value="recentes" className="mt-4">
+          <ProtocoloTable
+            data={recentesResult ?? []}
+            isLoading={recentesLoading}
+            activeTab="recentes"
+            hasFilters={false}
+          />
+        </TabsContent>
+
         {tabs
-          .filter((t) => t.value !== 'internos')
+          .filter((t) => t.value !== 'internos' && t.value !== 'recentes')
           .map((tab) => (
             <TabsContent key={tab.value} value={tab.value} className="mt-4">
               <ProtocoloTable

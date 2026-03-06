@@ -49,20 +49,26 @@ type ListDocumentosResponse struct {
 
 // ProtocoloDetalheResponse é a resposta detalhada de um protocolo.
 type ProtocoloDetalheResponse struct {
-	ID                    int        `json:"id"`
-	NumeroProtocolo       string     `json:"numero_protocolo"`
-	DataCriacao           *time.Time `json:"data_criacao"`
-	Assunto               string     `json:"assunto"`
-	NomeProjeto           string     `json:"nome_projeto"`
-	CodigoConvenio        string     `json:"codigo_convenio"`
-	NomeInteressado       string     `json:"nome_interessado"`
-	NomeSetorAtual        string     `json:"nome_setor_atual"`
-	CodSetorAtual         int        `json:"cod_setor_atual"`
-	DataChegadaSetor      *time.Time `json:"data_chegada_setor"`
-	Status                string     `json:"status"`
-	IsInternal            bool       `json:"is_internal"`
-	DocCount              int64      `json:"doc_count"`
-	ObservationCount      int64      `json:"observation_count"`
-	HasRecentObservations bool       `json:"has_recent_observations"`
-	TramitacaoCount       int64      `json:"tramitacao_count"`
+	ID                       int        `json:"id"`
+	NumeroProtocolo          string     `json:"numero_protocolo"`
+	DataCriacao              *time.Time `json:"data_criacao"`
+	Assunto                  string     `json:"assunto"`
+	NomeProjeto              string     `json:"nome_projeto"`
+	CodigoConvenio           string     `json:"codigo_convenio"`
+	NomeInteressado          string     `json:"nome_interessado"`
+	NomeSetorAtual           string     `json:"nome_setor_atual"`
+	CodSetorAtual            int        `json:"cod_setor_atual"`
+	DataChegadaSetor         *time.Time `json:"data_chegada_setor"`
+	Status                   string     `json:"status"`
+	IsInternal               bool       `json:"is_internal"`
+	DocCount                 int64      `json:"doc_count"`
+	ObservationCount         int64      `json:"observation_count"`
+	HasRecentObservations    bool       `json:"has_recent_observations"`
+	TramitacaoCount          int64      `json:"tramitacao_count"`
+	Interessado              string     `json:"interessado"`
+	Observacao               string     `json:"observacao"`
+	UsuarioCadastro          string     `json:"usuario_cadastro"`
+	ContaCorrente            string     `json:"conta_corrente"`
+	DiasUltimaMovimentacao   int        `json:"dias_ultima_movimentacao"`
+	Situacao                 string     `json:"situacao"`
 }

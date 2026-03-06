@@ -83,7 +83,17 @@ export function ChartUploadsPeriodo({
               interval="preserveStartEnd"
             />
             <YAxis
-              tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+              yAxisId="left"
+              tick={{ fontSize: 11, fill: '#7c3aed' }}
+              tickLine={false}
+              axisLine={false}
+              width={35}
+              allowDecimals={false}
+            />
+            <YAxis
+              yAxisId="right"
+              orientation="right"
+              tick={{ fontSize: 11, fill: '#0891b2' }}
               tickLine={false}
               axisLine={false}
               width={30}
@@ -103,6 +113,7 @@ export function ChartUploadsPeriodo({
               wrapperStyle={{ fontSize: '12px' }}
             />
             <Line
+              yAxisId="left"
               type="monotone"
               dataKey="protocolos_externos"
               name="Prot. Externos"
@@ -112,6 +123,7 @@ export function ChartUploadsPeriodo({
               activeDot={{ r: 4 }}
             />
             <Line
+              yAxisId="right"
               type="monotone"
               dataKey="protocolos_internos"
               name="Prot. Internos"
@@ -121,6 +133,7 @@ export function ChartUploadsPeriodo({
               activeDot={{ r: 4 }}
             />
             <Line
+              yAxisId="right"
               type="monotone"
               dataKey="uploads"
               name="Documentos"

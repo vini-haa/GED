@@ -180,17 +180,84 @@ func (s *DashboardService) UploadsPorPeriodo(ctx context.Context, q dto.Dashboar
 
 	// Gerar série completa de dias (preencher dias sem dados com zeros)
 	dias := q.PeriodoDays()
-	items := make([]dto.UploadsPeriodoItem, 0, dias)
+	dailyItems := make([]dto.UploadsPeriodoItem, 0, dias)
 	for i := dias - 1; i >= 0; i-- {
 		d := time.Now().AddDate(0, 0, -i).Format("2006-01-02")
 		if entry, ok := dayMap[d]; ok {
-			items = append(items, *entry)
+			dailyItems = append(dailyItems, *entry)
 		} else {
-			items = append(items, dto.UploadsPeriodoItem{Data: d})
+			dailyItems = append(dailyItems, dto.UploadsPeriodoItem{Data: d})
 		}
 	}
 
-	return items, nil
+	// Para períodos longos, agregar para melhor visualização
+	if dias > 60 {
+		return aggregateByPeriod(dailyItems, dias), nil
+	}
+
+	return dailyItems, nil
+}
+
+// aggregateByPeriod agrupa dados diários por semana (até 180d) ou mês (acima).
+func aggregateByPeriod(items []dto.UploadsPeriodoItem, dias int) []dto.UploadsPeriodoItem {
+	if len(items) == 0 {
+		return items
+	}
+
+	bucketFormat := "2006-01" // mensal
+	labelFormat := "Jan/2006"
+	if dias <= 180 {
+		// semanal: agrupar de 7 em 7 dias
+		return aggregateByWeek(items)
+	}
+
+	buckets := make(map[string]*dto.UploadsPeriodoItem)
+	var order []string
+
+	for _, item := range items {
+		t, err := time.Parse("2006-01-02", item.Data)
+		if err != nil {
+			continue
+		}
+		key := t.Format(bucketFormat)
+		if _, ok := buckets[key]; !ok {
+			buckets[key] = &dto.UploadsPeriodoItem{Data: t.Format(labelFormat)}
+			order = append(order, key)
+		}
+		b := buckets[key]
+		b.Uploads += item.Uploads
+		b.ProtocolosExternos += item.ProtocolosExternos
+		b.ProtocolosInternos += item.ProtocolosInternos
+	}
+
+	result := make([]dto.UploadsPeriodoItem, 0, len(order))
+	for _, key := range order {
+		result = append(result, *buckets[key])
+	}
+	return result
+}
+
+// aggregateByWeek agrupa dados diários em blocos de 7 dias.
+func aggregateByWeek(items []dto.UploadsPeriodoItem) []dto.UploadsPeriodoItem {
+	var result []dto.UploadsPeriodoItem
+
+	for i := 0; i < len(items); i += 7 {
+		end := i + 7
+		if end > len(items) {
+			end = len(items)
+		}
+		bucket := dto.UploadsPeriodoItem{
+			Data: items[i].Data, // usa a data do primeiro dia da semana
+		}
+		for _, item := range items[i:end] {
+			bucket.Uploads += item.Uploads
+			bucket.ProtocolosExternos += item.ProtocolosExternos
+			bucket.ProtocolosInternos += item.ProtocolosInternos
+		}
+		result = append(result, bucket)
+	}
+
+	return result
 }
 
 type sagiDayCount struct {

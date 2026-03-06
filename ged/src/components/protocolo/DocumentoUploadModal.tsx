@@ -272,7 +272,7 @@ export function DocumentoUploadModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-[562px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Anexar Documentos</DialogTitle>
           <DialogDescription>
@@ -287,7 +287,7 @@ export function DocumentoUploadModal({
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           onClick={() => !uploading && inputRef.current?.click()}
-          className={`relative flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-6 transition-colors ${
+          className={`relative flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-8 transition-colors ${
             uploading
               ? 'cursor-not-allowed border-border/30 bg-muted/20 opacity-60'
               : isDragOver
@@ -387,7 +387,7 @@ export function DocumentoUploadModal({
                         }
                         disabled={uploading}
                       >
-                        <SelectTrigger className={`h-8 w-32 text-xs shrink-0 ${!item.tipoDocumentoId ? 'border-destructive' : ''}`}>
+                        <SelectTrigger className={`h-8 w-36 text-xs shrink-0 ${!item.tipoDocumentoId ? 'border-destructive' : ''}`}>
                           <SelectValue placeholder="Selecione..." />
                         </SelectTrigger>
                         <SelectContent>

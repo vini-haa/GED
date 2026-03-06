@@ -32,6 +32,8 @@ import { TramitarModal } from '@/components/protocolo-interno/TramitarModal';
 import { EditarProtocoloModal } from '@/components/protocolo-interno/EditarProtocoloModal';
 import { DocumentoList } from '@/components/protocolo/DocumentoList';
 import { ObservacaoList } from '@/components/protocolo/ObservacaoList';
+import { DossieExportButton } from '@/components/protocolo/DossieExportButton';
+import { DownloadZipButton } from '@/components/protocolo/DownloadZipButton';
 import {
   useProtocoloInternoDetail,
   useTramitacaoInterna,
@@ -236,6 +238,20 @@ export default function ProtocoloInternoDetalhesPage({ params }: PageProps) {
         </div>
       )}
 
+      {/* Acoes de exportacao */}
+      <div className="flex items-center gap-3">
+        <DossieExportButton
+          source="interno"
+          id={idStr}
+          protocoloSagi={protocolo.protocol_number}
+        />
+        <DownloadZipButton
+          source="interno"
+          id={idStr}
+          documentCount={protocolo.doc_count}
+        />
+      </div>
+
       {/* Abas: Documentos, Observacoes, Tramitacao */}
       <Tabs defaultValue="documentos">
         <TabsList>
@@ -326,16 +342,27 @@ export default function ProtocoloInternoDetalhesPage({ params }: PageProps) {
                       >
                         {/* Setores */}
                         <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant="outline" className="text-xs">
-                            {formatSectorName(item.from_sector_name)}
-                          </Badge>
-                          <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
-                          <Badge
-                            variant={item.is_current ? 'default' : 'outline'}
-                            className="text-xs"
-                          >
-                            {formatSectorName(item.to_sector_name)}
-                          </Badge>
+                          {item.from_sector_name ? (
+                            <>
+                              <Badge variant="outline" className="text-xs">
+                                {formatSectorName(item.from_sector_name)}
+                              </Badge>
+                              <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                              <Badge
+                                variant={item.is_current ? 'default' : 'outline'}
+                                className="text-xs"
+                              >
+                                {formatSectorName(item.to_sector_name)}
+                              </Badge>
+                            </>
+                          ) : (
+                            <Badge
+                              variant={item.is_current ? 'default' : 'outline'}
+                              className="text-xs"
+                            >
+                              {formatSectorName(item.to_sector_name)}
+                            </Badge>
+                          )}
                         </div>
 
                         {/* Despacho */}

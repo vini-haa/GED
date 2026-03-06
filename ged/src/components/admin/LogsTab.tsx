@@ -45,6 +45,7 @@ const PER_PAGE = 10;
 const ACTION_LABELS: Record<LogAction, string> = {
   LOGIN: 'Login',
   UPLOAD: 'Upload',
+  DOWNLOAD: 'Download',
   DELETE: 'Exclusão',
   EDIT: 'Edição',
   CREATE: 'Criação',
@@ -56,6 +57,7 @@ const ACTION_LABELS: Record<LogAction, string> = {
 const ACTION_VARIANTS: Record<LogAction, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   LOGIN: 'secondary',
   UPLOAD: 'default',
+  DOWNLOAD: 'secondary',
   DELETE: 'destructive',
   EDIT: 'outline',
   CREATE: 'default',
@@ -71,6 +73,8 @@ function ActionIcon({ action }: { action: LogAction }) {
       return <LogIn className={className} />;
     case 'UPLOAD':
       return <Upload className={className} />;
+    case 'DOWNLOAD':
+      return <Download className={className} />;
     case 'DELETE':
       return <Trash2 className={className} />;
     case 'EDIT':
@@ -253,7 +257,6 @@ export function LogsTab() {
                 <TableHead className="w-[100px]">Ação</TableHead>
                 <TableHead>Descrição</TableHead>
                 <TableHead className="hidden md:table-cell w-[160px]">Usuário</TableHead>
-                <TableHead className="hidden lg:table-cell w-[140px]">Setor</TableHead>
                 <TableHead className="w-[130px]">Quando</TableHead>
               </TableRow>
             </TableHeader>
@@ -319,9 +322,9 @@ function LogRow({ log, isExpanded, onToggle }: LogRowProps) {
           )}
         </TableCell>
         <TableCell>
-          <Badge variant={ACTION_VARIANTS[log.acao]} className="gap-1">
-            <ActionIcon action={log.acao} />
-            {ACTION_LABELS[log.acao]}
+          <Badge variant={ACTION_VARIANTS[log.acao] ?? 'outline'} className="gap-1">
+            {ACTION_LABELS[log.acao] ? <ActionIcon action={log.acao} /> : null}
+            {ACTION_LABELS[log.acao] ?? log.acao}
           </Badge>
         </TableCell>
         <TableCell className="max-w-[300px] truncate text-sm">
@@ -330,11 +333,8 @@ function LogRow({ log, isExpanded, onToggle }: LogRowProps) {
         <TableCell className="hidden md:table-cell">
           <div>
             <p className="text-sm font-medium">{log.usuarioNome}</p>
-            <p className="text-xs text-muted-foreground">{log.usuarioEmail}</p>
+            <p className="text-xs text-muted-foreground">{log.setor || log.usuarioEmail}</p>
           </div>
-        </TableCell>
-        <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
-          {log.setor}
         </TableCell>
         <TableCell className="text-sm text-muted-foreground">
           {formatDateTime(log.criadoEm)}
@@ -344,7 +344,7 @@ function LogRow({ log, isExpanded, onToggle }: LogRowProps) {
       {/* Linha expandida com detalhes */}
       {isExpanded && hasDetails && (
         <TableRow className="!border-border/30 bg-muted/10 hover:!bg-muted/10">
-          <TableCell colSpan={6} className="p-4">
+          <TableCell colSpan={5} className="p-4">
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {Object.entries(log.detalhes!).map(([key, value]) => (
                 <div key={key} className="rounded-lg bg-muted/30 px-3 py-2">

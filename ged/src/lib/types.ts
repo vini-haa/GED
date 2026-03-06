@@ -27,6 +27,7 @@ export type ProtocolTab =
 
 export interface Protocol {
   id: number;
+  internal_id?: string;
   numero_protocolo: string;
   data_criacao: string | null;
   assunto: string;
@@ -116,6 +117,12 @@ export interface ProtocoloDetalhe {
   observation_count: number;
   has_recent_observations: boolean;
   tramitacao_count: number;
+  interessado: string;
+  observacao: string;
+  usuario_cadastro: string;
+  conta_corrente: string;
+  dias_ultima_movimentacao: number;
+  situacao: string;
 }
 
 // ============================================
@@ -196,6 +203,10 @@ export interface TramitacaoSagi {
   situacao: string;
   reg_atual: boolean;
   permanencia_dias: number;
+  usuario_envio: string;
+  usuario_recebimento: string;
+  data_recebimento: string | null;
+  observacao: string;
 }
 
 export interface TramitacaoResumo {
@@ -408,6 +419,7 @@ export interface AdminUser {
 export type LogAction =
   | 'LOGIN'
   | 'UPLOAD'
+  | 'DOWNLOAD'
   | 'DELETE'
   | 'EDIT'
   | 'CREATE'

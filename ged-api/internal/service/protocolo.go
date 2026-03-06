@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
 	"time"
 
@@ -33,6 +34,11 @@ func (s *ProtocoloService) List(ctx context.Context, q dto.ListProtocolosQuery) 
 	// Tab "internos" é tratado diferente — busca do PostgreSQL
 	if q.Tab == "internos" {
 		return s.listInternos(ctx, q)
+	}
+
+	// Tab "todos" combina SAGI + internos
+	if q.Tab == "todos" {
+		return s.listTodos(ctx, q)
 	}
 
 	if s.sagiRepo == nil {
@@ -194,6 +200,162 @@ func (s *ProtocoloService) filterSemDocs(ctx context.Context, q dto.ListProtocol
 	}, nil
 }
 
+// listTodos combina protocolos SAGI + internos, ordenados por data_criacao DESC.
+func (s *ProtocoloService) listTodos(ctx context.Context, q dto.ListProtocolosQuery) (*dto.ListProtocolosResponse, error) {
+	// 1. Buscar internos do PostgreSQL (todos, sem paginação — geralmente poucos)
+	internosParams := db.ListProtocolosInternosParams{
+		Limit:  1000, // internos são poucos
+		Offset: 0,
+	}
+	if q.Status != "" {
+		internosParams.Status = pgtype.Text{String: q.Status, Valid: true}
+	}
+	if q.Search != "" {
+		internosParams.Busca = pgtype.Text{String: q.Search, Valid: true}
+	}
+
+	internos, err := s.queries.ListProtocolosInternos(ctx, internosParams)
+	if err != nil {
+		log.Error().Err(err).Msg("erro ao listar internos para tab todos")
+		internos = nil
+	}
+
+	countInternosParams := db.CountProtocolosInternosParams{
+		Status: internosParams.Status,
+		Busca:  internosParams.Busca,
+	}
+	totalInternos, err := s.queries.CountProtocolosInternos(ctx, countInternosParams)
+	if err != nil {
+		totalInternos = int64(len(internos))
+	}
+
+	// Converter internos em ProtocoloItem
+	internoItems := make([]dto.ProtocoloItem, 0, len(internos))
+	for _, p := range internos {
+		internoItems = append(internoItems, internoToItem(p))
+	}
+
+	// 2. Buscar SAGI (se disponível)
+	var sagiItems []dto.ProtocoloItem
+	var totalSagi int64
+
+	if s.sagiRepo != nil {
+		ordenacao := q.Ordenacao
+		if ordenacao == "" && q.Setor != nil {
+			ordenacao = "data_chegada_setor"
+		}
+		filters := repository.ProtocoloListFilters{
+			Setor:      q.Setor,
+			Status:     q.Status,
+			Search:     q.Search,
+			DataInicio: q.DataInicio,
+			DataFim:    q.DataFim,
+			Offset:     q.Offset(),
+			Limit:      q.PageSize,
+			Ordenacao:  ordenacao,
+			Projeto:    q.Projeto,
+		}
+
+		protocolos, err := s.sagiRepo.ListProtocolos(ctx, filters)
+		if err != nil {
+			log.Error().Err(err).Msg("erro ao listar SAGI para tab todos")
+		} else {
+			totalSagi, err = s.sagiRepo.CountProtocolos(ctx, filters)
+			if err != nil {
+				totalSagi = int64(len(protocolos))
+			}
+
+			protoNums := make([]string, len(protocolos))
+			for i, p := range protocolos {
+				protoNums[i] = p.NumeroProtocolo
+			}
+			docCounts, obsFlags := s.enrichFromPostgres(ctx, protoNums)
+
+			sagiItems = make([]dto.ProtocoloItem, len(protocolos))
+			for i, p := range protocolos {
+				sagiItems[i] = dto.ProtocoloItem{
+					ID:                    p.ID,
+					NumeroProtocolo:       p.NumeroProtocolo,
+					DataCriacao:           p.DataCriacao,
+					Assunto:               p.Assunto,
+					NomeProjeto:           p.NomeProjeto,
+					CodigoConvenio:        p.CodigoConvenio,
+					NomeInteressado:       p.NomeInteressado,
+					NomeSetorAtual:        p.NomeSetorAtual,
+					CodSetorAtual:         p.CodSetorAtual,
+					DataChegadaSetor:      p.DataChegadaSetor,
+					Status:                p.Status,
+					DocCount:              docCounts[p.NumeroProtocolo],
+					IsNew:                 isNew(p.DataChegadaSetor),
+					HasRecentObservations: obsFlags[p.NumeroProtocolo],
+					IsInternal:            false,
+				}
+			}
+		}
+	}
+
+	// 3. Combinar e ordenar por data_criacao DESC
+	combined := make([]dto.ProtocoloItem, 0, len(sagiItems)+len(internoItems))
+	combined = append(combined, sagiItems...)
+	combined = append(combined, internoItems...)
+
+	sort.Slice(combined, func(i, j int) bool {
+		di := combined[i].DataCriacao
+		dj := combined[j].DataCriacao
+		if di == nil && dj == nil {
+			return false
+		}
+		if di == nil {
+			return false
+		}
+		if dj == nil {
+			return true
+		}
+		return di.After(*dj)
+	})
+
+	// Truncar ao page_size (SAGI já veio paginado, internos são poucos)
+	if len(combined) > q.PageSize {
+		combined = combined[:q.PageSize]
+	}
+
+	total := totalSagi + totalInternos
+
+	return &dto.ListProtocolosResponse{
+		Data: combined,
+		Pagination: dto.Pagination{
+			Page:       q.Page,
+			PageSize:   q.PageSize,
+			Total:      total,
+			TotalPages: dto.CalcTotalPages(total, q.PageSize),
+		},
+	}, nil
+}
+
+// internoToItem converte um protocolo interno do PostgreSQL em ProtocoloItem.
+func internoToItem(p db.ProtocolosInterno) dto.ProtocoloItem {
+	var dataCriacao *time.Time
+	if p.CriadoEm.Valid {
+		dataCriacao = &p.CriadoEm.Time
+	}
+	status := "ABERTO"
+	if p.Status.Valid {
+		status = p.Status.String
+	}
+	return dto.ProtocoloItem{
+		ID:              0,
+		InternalID:      p.ID.String(),
+		NumeroProtocolo: p.Numero,
+		DataCriacao:     dataCriacao,
+		Assunto:         p.Assunto,
+		NomeProjeto:     "",
+		NomeInteressado: p.CriadoPorNome,
+		NomeSetorAtual:  p.SetorOrigem,
+		Status:          status,
+		IsInternal:      true,
+	}
+}
+
 // listInternos busca protocolos internos do PostgreSQL.
 func (s *ProtocoloService) listInternos(ctx context.Context, q dto.ListProtocolosQuery) (*dto.ListProtocolosResponse, error) {
 	params := db.ListProtocolosInternosParams{
@@ -223,25 +385,7 @@ func (s *ProtocoloService) listInternos(ctx context.Context, q dto.ListProtocolo
 
 	items := make([]dto.ProtocoloItem, len(internos))
 	for i, p := range internos {
-		var dataCriacao *time.Time
-		if p.CriadoEm.Valid {
-			dataCriacao = &p.CriadoEm.Time
-		}
-		status := "ABERTO"
-		if p.Status.Valid {
-			status = p.Status.String
-		}
-		items[i] = dto.ProtocoloItem{
-			ID:              0,
-			NumeroProtocolo: p.Numero,
-			DataCriacao:     dataCriacao,
-			Assunto:         p.Assunto,
-			NomeProjeto:     "",
-			NomeInteressado: p.CriadoPorNome,
-			NomeSetorAtual:  p.SetorOrigem,
-			Status:          status,
-			IsInternal:      true,
-		}
+		items[i] = internoToItem(p)
 	}
 
 	return &dto.ListProtocolosResponse{
@@ -505,22 +649,28 @@ func (s *ProtocoloService) getSAGIByID(ctx context.Context, id string) (*dto.Pro
 	tramitacaoCount, _ = s.sagiRepo.CountTramitacoesByProtocolo(ctx, proto.ID)
 
 	return &dto.ProtocoloDetalheResponse{
-		ID:                    proto.ID,
-		NumeroProtocolo:       proto.NumeroProtocolo,
-		DataCriacao:           proto.DataCriacao,
-		Assunto:               proto.Assunto,
-		NomeProjeto:           proto.NomeProjeto,
-		CodigoConvenio:        proto.CodigoConvenio,
-		NomeInteressado:       proto.NomeInteressado,
-		NomeSetorAtual:        proto.NomeSetorAtual,
-		CodSetorAtual:         proto.CodSetorAtual,
-		DataChegadaSetor:      proto.DataChegadaSetor,
-		Status:                proto.Status,
-		IsInternal:            false,
-		DocCount:              docCount,
-		ObservationCount:      obsCount,
-		HasRecentObservations: hasRecentObs,
-		TramitacaoCount:       tramitacaoCount,
+		ID:                       proto.ID,
+		NumeroProtocolo:          proto.NumeroProtocolo,
+		DataCriacao:              proto.DataCriacao,
+		Assunto:                  proto.Assunto,
+		NomeProjeto:              proto.NomeProjeto,
+		CodigoConvenio:           proto.CodigoConvenio,
+		NomeInteressado:          proto.NomeInteressado,
+		NomeSetorAtual:           proto.NomeSetorAtual,
+		CodSetorAtual:            proto.CodSetorAtual,
+		DataChegadaSetor:         proto.DataChegadaSetor,
+		Status:                   proto.Status,
+		IsInternal:               false,
+		DocCount:                 docCount,
+		ObservationCount:         obsCount,
+		HasRecentObservations:    hasRecentObs,
+		TramitacaoCount:          tramitacaoCount,
+		Interessado:              proto.Interessado,
+		Observacao:               proto.Observacao,
+		UsuarioCadastro:          proto.UsuarioCadastro,
+		ContaCorrente:            proto.ContaCorrente,
+		DiasUltimaMovimentacao:   proto.DiasUltimaMovimentacao,
+		Situacao:                 proto.Situacao,
 	}, nil
 }
 

@@ -76,6 +76,7 @@ func (q *RecentQuery) Defaults() {
 
 type ProtocoloItem struct {
 	ID                    int        `json:"id"`
+	InternalID            string     `json:"internal_id,omitempty"`
 	NumeroProtocolo       string     `json:"numero_protocolo"`
 	DataCriacao           *time.Time `json:"data_criacao"`
 	Assunto               string     `json:"assunto"`

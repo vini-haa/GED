@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { formatDateTime, parseLocalDate } from '@/lib/date-utils';
-import { ArrowRight, Clock, MapPin, Route, BarChart3 } from 'lucide-react';
+import { ArrowRight, Clock, MapPin, Route, UserRound, MessageSquare } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTramitacoes } from '@/hooks/use-observacoes';
@@ -159,16 +159,27 @@ export function TramitacaoTimeline({
                 >
                   {/* Setores */}
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant="outline" className="text-xs">
-                      {formatSectorName(item.setor_origem)}
-                    </Badge>
-                    <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
-                    <Badge
-                      variant={isCurrent ? 'default' : 'outline'}
-                      className="text-xs"
-                    >
-                      {formatSectorName(item.setor_destino)}
-                    </Badge>
+                    {item.setor_origem ? (
+                      <>
+                        <Badge variant="outline" className="text-xs">
+                          {formatSectorName(item.setor_origem)}
+                        </Badge>
+                        <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <Badge
+                          variant={isCurrent ? 'default' : 'outline'}
+                          className="text-xs"
+                        >
+                          {formatSectorName(item.setor_destino)}
+                        </Badge>
+                      </>
+                    ) : (
+                      <Badge
+                        variant={isCurrent ? 'default' : 'outline'}
+                        className="text-xs"
+                      >
+                        {formatSectorName(item.setor_destino)}
+                      </Badge>
+                    )}
                     {item.situacao && (
                       <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                         {item.situacao}
@@ -189,6 +200,35 @@ export function TramitacaoTimeline({
                       {isCurrent && ' (atual)'}
                     </span>
                   </div>
+
+                  {/* Usuários envio/recebimento */}
+                  {(item.usuario_envio || item.usuario_recebimento) && (
+                    <div className="mt-2 flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
+                      {item.usuario_envio && (
+                        <span className="flex items-center gap-1">
+                          <UserRound className="h-3 w-3" />
+                          Enviado por: {item.usuario_envio}
+                        </span>
+                      )}
+                      {item.usuario_recebimento && (
+                        <span className="flex items-center gap-1">
+                          <UserRound className="h-3 w-3" />
+                          Recebido por: {item.usuario_recebimento}
+                          {item.data_recebimento && (
+                            <> em {formatDateTime(item.data_recebimento)}</>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Observação da movimentação */}
+                  {item.observacao && (
+                    <div className="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
+                      <MessageSquare className="h-3 w-3 mt-0.5 shrink-0" />
+                      <p className="whitespace-pre-line">{item.observacao}</p>
+                    </div>
+                  )}
                 </div>
               </div>
             );

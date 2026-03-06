@@ -132,8 +132,8 @@ func (h *DownloadHandler) ExportDossie(c *gin.Context) {
 	email := middleware.GetUserEmail(c)
 	nome := middleware.GetUserName(c)
 
-	fileName := "dossie_" + sanitizeZipName(protocoloSagi) + ".zip"
-	c.Writer.Header().Set("Content-Type", "application/zip")
+	fileName := "dossie_" + sanitizeZipName(protocoloSagi) + ".pdf"
+	c.Writer.Header().Set("Content-Type", "application/pdf")
 	c.Writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileName))
 	c.Writer.WriteHeader(http.StatusOK)
 

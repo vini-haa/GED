@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { BarChart3, Calendar, Building2, FolderKanban, FileDown, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { BarChart3, Calendar, Building2, FolderKanban, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -42,7 +42,6 @@ export default function DashboardPage() {
 
   const { data, isLoading } = useDashboard(filters);
 
-  const [exportingPDF, setExportingPDF] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
 
   const buildExportParams = useCallback(() => {
@@ -53,18 +52,15 @@ export default function DashboardPage() {
     return params.toString();
   }, [filters]);
 
-  const handleExport = useCallback(
-    async (format: 'pdf' | 'excel') => {
-      const setLoading = format === 'pdf' ? setExportingPDF : setExportingExcel;
-      setLoading(true);
+  const handleExportExcel = useCallback(
+    async () => {
+      setExportingExcel(true);
 
       try {
         const token = localStorage.getItem('auth_token');
-        const baseUrl =
-          process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4017/api';
 
         const response = await fetch(
-          `${baseUrl}/dashboard/export/${format}?${buildExportParams()}`,
+          `/api/dashboard/export/excel?${buildExportParams()}`,
           {
             headers: {
               ...(token && { Authorization: `Bearer ${token}` }),
@@ -81,8 +77,7 @@ export default function DashboardPage() {
 
         const blob = await response.blob();
         const contentDisposition = response.headers.get('Content-Disposition');
-        const ext = format === 'pdf' ? 'pdf' : 'xlsx';
-        let fileName = `dashboard_ged_${new Date().toISOString().slice(0, 10)}.${ext}`;
+        let fileName = `dashboard_ged_${new Date().toISOString().slice(0, 10)}.xlsx`;
         if (contentDisposition) {
           const match = contentDisposition.match(/filename="(.+)"/);
           if (match) fileName = match[1];
@@ -98,10 +93,10 @@ export default function DashboardPage() {
         URL.revokeObjectURL(url);
       } catch (err) {
         const message =
-          err instanceof Error ? err.message : `Erro ao exportar ${format.toUpperCase()}`;
+          err instanceof Error ? err.message : 'Erro ao exportar Excel';
         toast({ title: 'Erro', description: message, variant: 'destructive' });
       } finally {
-        setLoading(false);
+        setExportingExcel(false);
       }
     },
     [buildExportParams]
@@ -121,36 +116,20 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            disabled={exportingPDF}
-            onClick={() => handleExport('pdf')}
-          >
-            {exportingPDF ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <FileDown className="h-4 w-4" />
-            )}
-            {exportingPDF ? 'Gerando...' : 'PDF'}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            disabled={exportingExcel}
-            onClick={() => handleExport('excel')}
-          >
-            {exportingExcel ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <FileSpreadsheet className="h-4 w-4" />
-            )}
-            {exportingExcel ? 'Gerando...' : 'Excel'}
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          disabled={exportingExcel}
+          onClick={handleExportExcel}
+        >
+          {exportingExcel ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <FileSpreadsheet className="h-4 w-4" />
+          )}
+          {exportingExcel ? 'Gerando...' : 'Excel'}
+        </Button>
       </div>
 
       {/* Filtros globais */}

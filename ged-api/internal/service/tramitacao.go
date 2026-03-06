@@ -68,13 +68,17 @@ func (s *TramitacaoService) GetByProtocolo(ctx context.Context, protocolID int) 
 		}
 
 		items[i] = dto.TramitacaoItem{
-			Sequencia:        t.Sequencia,
-			DataMovimentacao: t.DataMovimentacao,
-			SetorOrigem:      t.SetorOrigem,
-			SetorDestino:     t.SetorDestino,
-			Situacao:         t.Situacao,
-			RegAtual:         t.RegAtual,
-			PermanenciaDias:  permanencia,
+			Sequencia:          t.Sequencia,
+			DataMovimentacao:   t.DataMovimentacao,
+			SetorOrigem:        t.SetorOrigem,
+			SetorDestino:       t.SetorDestino,
+			Situacao:           t.Situacao,
+			RegAtual:           t.RegAtual,
+			PermanenciaDias:    permanencia,
+			UsuarioEnvio:       t.UsuarioEnvio,
+			UsuarioRecebimento: t.UsuarioRecebimento,
+			DataRecebimento:    t.DataRecebimento,
+			Observacao:         t.Observacao,
 		}
 	}
 
